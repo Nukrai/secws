@@ -1,0 +1,3 @@
+To add counting support i kept count in a variable for accepted and dropped packets.
+also, i used the moodle example to implement the logic required for printing to the sysfs file(accepted count, dropped count and thier sum seperated by a comma).
+the python user side takes 0 or 1 arguments and reads/writes to the file accordingly.

@@ -1,0 +1,162 @@
+#! /usr/bin/python3
+import sys, socket, struct, re, subprocess, time
+import datetime as dt
+from os import system
+  
+ANY_IP = "0.0.0.0/0"
+RULES_TEMP_PATH = "/tmp/firewall_temp_ldvsvsnvbub"
+RESET_PATH = "/sys/class/fw/log/reset" 
+LOG_PATH =   "/dev/fw_log"
+RULES_PATH = "/sys/class/fw/rules/rules"
+
+LOG_HEADER =	["timestamp                     ",
+		 "src_ip                        ",
+		 "dst_ip                        ",
+		 "src_port      ",
+		 "dst_port      ",
+		 "protocol      ",
+		 "hooknum               ",
+		 "action        ",
+		 "reason                        ",
+		 "count\n"]
+
+commands = ["show_rules", "load_rules", "show_log", "clear_log"]
+
+direction = {"any":"3", "in":"1", "out":"2"}
+idirection = {direction[x] : x for x in direction} 
+
+protocols = {"TCP":"6", "ICMP":"1", "UDP":"17", "OTHER":"255", "any":"143"}
+iprotocols = {protocols[x] : x for x in protocols}
+
+ports = {"any":"0", ">1023":"1023"}
+iports = {ports[x]: x for x in ports}  
+
+acks = {"any":"3", "no":"1", "yes":"2"}
+iacks = {acks[x] : x for x in acks}
+
+actions = {"accept":"1", "drop":"0"}
+iactions = {actions[x] : x for x in actions}
+
+ireasons = {"-1":"REASON_FW_INACTIVE", "-2":"REASON_NO_MATCHING_RULE", "-4":"REASON_XMAS_PACKET", "-6": "REASON_ILLEGAL_VALUE"}
+
+# based on https://stackoverflow.com/questions/5619685/conversion-from-ip-string-to-integer-and-backward-in-python
+def ip2int(addr):
+	if(addr == "any"):
+		return "0 0"
+	addr = addr.split("/")
+
+	addr[0] = ".".join(addr[0].split(".")[::-1])
+	if(len(addr) != 2 or not(0 <= int(addr[1]) <= 32)):
+		print(len(addr),"dsc")
+		raise Exception()
+	return str(struct.unpack("!I", socket.inet_aton(addr[0]))[0]) + " " + addr[1]
+
+def int2ip(addr):
+	return ".".join(socket.inet_ntoa(struct.pack("!I", addr)).split(".")[::-1])
+
+# see https://stackoverflow.com/questions/4770297/convert-utc-datetime-string-to-local-datetime
+def utc_to_local(utc_datetime):
+    now_timestamp = time.time()
+    offset = dt.datetime.fromtimestamp(now_timestamp) - dt.datetime.utcfromtimestamp(now_timestamp)
+    return utc_datetime + offset
+# from rules file to the kernel module format
+def parse(rules):
+	lines = rules.split("\n")
+	ret = ""
+	try:
+		for line in lines:
+			args = line.split(" ")
+			if(len(args) != 9):
+				continue
+			args[1] = direction[args[1]]
+			args[2] = str(ip2int(args[2]))
+			args[3] = str(ip2int(args[3]))
+			args[4] = protocols[args[4]]
+			args[5] = ports[args[5]] if args[5] in ports else args[5]
+			args[6] = ports[args[6]] if args[6] in ports else args[6]
+			sport,dport = int(args[5]), int(args[6])
+			if(not(0 <= sport <= 1023 and 0 <= dport <= 1023)):
+				print("Vds",sport,dport)
+				continue
+			args[7] = acks[args[7]]
+			args[8] = actions[args[8]]
+			ret += " ".join(args)
+			ret += "\n"
+		return ret[:-1]
+	except Exception as e: # not in format
+		return ""
+	
+
+# from kernel module format to rules file
+def unparse(rules):
+	ret = ""
+	lines = rules.split("\n")
+	for line in lines:
+		args = re.split(" |/", line.strip())
+		if(len(args) < 11):
+			continue
+		args[1] = idirection[args[1]]
+		args[2] = int2ip(int(args[2])) + "/"
+		args[4] = int2ip(int(args[4])) + "/"
+		args[6] = iprotocols[args[6]] if args[6] in iprotocols else args[6]
+		args[7] = iports[args[7]] if args[7] in iports else args[7]
+		args[8] = iports[args[8]] if args[8] in iports else args[8]
+		args[9] = iacks[args[9]]
+		args[10] = iactions[args[10]]
+		ret += " ".join(args).replace("/ ", "/")
+		ret += "\n"
+	return ret[:-1].replace(ANY_IP,"any")
+
+# from kernel module log format to file log format
+def unlog(log):
+	ret = "".join(LOG_HEADER)
+	lines = log.split("\n")
+	for line in lines:
+		args = line.split(" ")
+		if(len(args) < 9):
+			continue
+		args[0] = utc_to_local(dt.datetime.utcfromtimestamp(int(args[0]))).strftime("%d/%m/%Y %H:%M:%S")
+		args[1] = int2ip(int(args[1]))
+		args[2] = int2ip(int(args[2]))
+		args[5] = iprotocols[args[5]].lower()
+		args[7] = iactions[args[7]]
+		args[8] = ireasons[args[8]] if args[8] in ireasons else args[8]
+		for i in range(len(LOG_HEADER)):
+			ret += args[i].ljust(len(LOG_HEADER[i]))
+		ret += "\n"
+	return ret[:-1]
+
+
+# wrong no. of args
+if(len(sys.argv) != 2 and not(len(sys.argv) == 3 and sys.argv[1] == commands[1])):
+	print("Usage: [./main show_rules] OR [./main load_rules <path_to_rules>] OR [./main show_log] OR ./main clear_log")
+	exit(-1)
+command = sys.argv[1]
+#not a valid command
+if(command not in commands):
+	print("Usage: [./main show_rules] OR [./main load_rules <path_to_rules>] OR [./main show_log] OR ./main clear_log")
+	exit(-1);
+if(command == commands[0]): # show_rules
+	with open(RULES_PATH, "r") as f:
+		rules = f.read()
+		print(unparse(rules))
+
+if(command == commands[1]): # load_rules
+	path = sys.argv[2]
+	with open(path, "r") as f:
+		rules = f.read()
+		parsed_rules = parse(rules)
+		if(parsed_rules == ""):
+			print("Input not standartized, please format the file")
+			exit(-1)
+		with open(RULES_TEMP_PATH, "w+") as out:
+			out.write(parsed_rules)
+		ret = system("cat {0} > {1}".format(RULES_TEMP_PATH, RULES_PATH))
+
+if(command == commands[2]): # show_log
+	proc = subprocess.Popen(["cat", LOG_PATH], stdout=subprocess.PIPE)
+	log = proc.communicate()[0].decode("utf-8")
+	print(unlog(log))
+
+if(command == commands[3]): # clear log
+	system('echo "0" > {0}'.format(RESET_PATH))	

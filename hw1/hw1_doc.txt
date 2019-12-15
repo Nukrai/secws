@@ -1,0 +1,4 @@
+for the implementation of the program, i decided to hook of nf_local_in/out  and nf_forward. 
+the init function registers the hook accordingly, with hooknum=point to hook, hook function, pf that matches ipv4 and first in the priority
+ the hook functions drop if it's forward's hook function, otherwise accept.
+ofc when exiting we unregister. 
