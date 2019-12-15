@@ -91,7 +91,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 			direction = -1;	
 		}
 		else{
-			direction = strncmp(out -> name, "eth2", 4) ? DIRECTION_OUT : strncmp(out -> name, "eth1", 4) ? DIRECTION_IN : -1;
+			direction = !strncmp(out -> name, "eth2", 4) ? DIRECTION_OUT : !strncmp(out -> name, "eth1", 4) ? DIRECTION_IN : -1;
 		}
 	}
 	else{
