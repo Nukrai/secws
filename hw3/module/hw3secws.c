@@ -54,7 +54,6 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	direction_t direction;
 	log_piece* p;
 	unsigned char protocol = ip_header -> protocol;
-	printk("[hook ip1=%x ip2=%x]\n", src_ip,dst_ip);
 	if(compare_ip(src_ip, loopback, 8) || compare_ip(dst_ip, loopback, 8)){ //loopback packets
 		return NF_ACCEPT;
 	}
@@ -88,7 +87,6 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	}
 	// find direction
 	if(in != NULL && out != NULL){
-		printk("%s %s \n", in -> name, out -> name);
 		if(!(strlen(in -> name) == 4 && strlen(out -> name) == 4)){
 			direction = -1;	
 		}

@@ -47,7 +47,7 @@ def ip2int(addr):
 
 	addr[0] = ".".join(addr[0].split(".")[::-1])
 	if(len(addr) != 2 or not(0 <= int(addr[1]) <= 32)):
-		print(len(addr),"dsc")
+		print(len(addr))
 		raise Exception()
 	return str(struct.unpack("!I", socket.inet_aton(addr[0]))[0]) + " " + addr[1]
 
@@ -76,7 +76,6 @@ def parse(rules):
 			args[6] = ports[args[6]] if args[6] in ports else args[6]
 			sport,dport = int(args[5]), int(args[6])
 			if(not(0 <= sport <= 1023 and 0 <= dport <= 1023)):
-				print("Vds",sport,dport)
 				continue
 			args[7] = acks[args[7]]
 			args[8] = actions[args[8]]

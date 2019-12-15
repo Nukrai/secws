@@ -89,14 +89,11 @@ int compare_ip(unsigned int ip1, unsigned int ip2, int mask){
 	if(mask == 32){
 		real_mask = 0xffffffff;
 	}
-	//printk("ip1=%x, ip2=%x, mask=%d\n", ip1, ip2, mask);
 	int ret = !((ip1 ^ ip2) & real_mask);
-	//printk("ret=%d, mask=%u\n", ret, real_mask);
 	return ret;
 }
 // search for rule with these parameters. -1 if not found
 int search_rule(int direction, unsigned int src_ip, unsigned int dst_ip, int src_port, int dst_port, int protocol, int ack){
-	printk("[search_rule] %x %x\n", src_ip, dst_ip);
 	for(int i = 0; i < rule_num;i++){
 		if(rule_list[i].direction != direction && rule_list[i].direction != DIRECTION_ANY){
 			continue;
@@ -107,8 +104,7 @@ int search_rule(int direction, unsigned int src_ip, unsigned int dst_ip, int src
                 if(!compare_ip(rule_list[i].dst_ip, dst_ip, rule_list[i].dst_prefix_size) && (rule_list[i].dst_ip != 0)){
                         continue;
                 }
-		printk("rule src %d dst %d packet src %d dst %d\n", rule_list[i].src_port, rule_list[i].dst_port,src_port,dst_port);
-                if((rule_list[i].src_port != src_port) &&
+	        if((rule_list[i].src_port != src_port) &&
 			 (rule_list[i].src_port < 1023 || src_port < 1023) &&
 			 (rule_list[i].src_port != PORT_ANY)){
                         continue;
@@ -121,8 +117,7 @@ int search_rule(int direction, unsigned int src_ip, unsigned int dst_ip, int src
                 if((rule_list[i].protocol != protocol) && (rule_list[i].protocol != PROT_ANY)){
                         continue;
                 }
-		printk("[ack is %d]", rule_list[i].ack);
-                if(!(rule_list[i].ack & (ack + 1)) && rule_list[i].ack != ACK_ANY && ack != ACK_ANY){ //(rule_list[i].ack != ack) && (rule_list[i].ack != ACK_ANY)){
+	        if(!(rule_list[i].ack & (ack + 1)) && rule_list[i].ack != ACK_ANY && ack != ACK_ANY){ //(rule_list[i].ack != ack) && (rule_list[i].ack != ACK_ANY)){
                         continue;
                 }
 		return i;
