@@ -1,0 +1,33 @@
+
+Module:
+	split into 3 code files and 3 headers
+	hw3secws.c -
+		main file. containes the hook func, registration code for the module.
+		hook func first checks the packet protocol and fills the details accordingly (and if it's TCP, makes sure the packet is not XMAS). then is searches for a rule and returns its action if found. if not - drops. then it logs its action using the log utils
+	ruler.c -
+		file for rule-table oriented operations / rule table utils.
+		main functions: 
+		search_rule - finds a rule index in the table or returns -1 if there is none. 
+		ruler_modify - loads from its file a new rule table
+		ruler_display - represents the current rule table 
+		create_rule - creates a new rule to be added to the table
+	logging.c -
+		file for logging related operations / logging utils.
+		main functions:
+		log_reset - log device reset/write function - clears the log
+		create_log - create a new log piece to be added to the log
+		log_str - creates a string repr. of the log
+		log_read - formats the log out to the reader
+		add_log	- adds a new entry to the log after invoking log_search to see that it's a new entry
+		search_log - searches if an identical log is present. if yes, adds its counter.
+
+User program:
+	written in python 3.
+	main funcions: 
+	parse - takes the rules file format and returns the easy to parse in kernel format of the rules. returns empty string of rules file is not in format
+	unparse - takes the kernel easy format and generates rules file format
+	unlog - takes the lernel easy log format to the unified, easy to read format given
+	ip2int - transfers string ip (such as "127.0.0.1/32") to its numeric form (including the mask)	
+	int2ip - does the opposite	
+	utc_to_local - fixes timezone related problems
+
