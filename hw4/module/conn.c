@@ -1,104 +1,147 @@
 #include "fw.h"
 #include "conn.h"
 
-void inc(void){
+void conn_inc(void){
 	allocnt++;
 }
-void dec(void){
+void conn_dec(void){
 	allocnt--;
 }
 
-int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, conn_t* conn){
+int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int fin, int rst, conn_t* conn){
 	if(src_ip == conn -> src_ip && src_port == conn -> src_port &&
-	   dst_ip == conn -> dst_ip && dst_port == conn -> dst_port){
-		return 1;
-	}
-	if(src_ip == conn -> dst_ip && src_port == conn -> dst_port &&
-           dst_ip == conn -> src_ip && dst_port == conn -> src_port){
+	   dst_ip == conn -> dst_ip && dst_port == conn -> dst_port && (rst || fin)){
 		return 2;
 	}
-	
+	//listen  to rst's in opposite direction 
+	if(dst_ip == conn -> src_ip && dst_port == conn -> src_port &&
+           src_ip == conn -> dst_ip && src_port == conn -> dst_port){
+                return 1;
+        }
+	//TODO: add HTTP & FTP 	
 	return 0;
 }
 
-unsigned int tcp_enforce(unsigned int src_ip, int port, unsigned int dst_ip, int port, int syn, int ack, int fin, int rst){
+unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst){
 	conn_t* conn;
-	int match;	
+	int match;
+	int no = 0;
 	for(int i = 0 ; i < conn_size; ++i){
 		conn = conn_list[i];
-
-		if((match= is_matching(src_ip, src_port, dst_ip, dst_port, conn)) != 0){
+		if((match = is_matching(src_ip, src_port, dst_ip, dst_port, fin, rst, conn)) != 0){
 			if(rst){
 				remove_connection(conn);
-				return NF_ACCEPT;
+				if(no > 0){
+					return NF_ACCEPT;
+				}
+				// 
+				no ++;
+				continue;
 			}
 			switch(conn -> state){
-				case SYN_SENT:
-					if(syn && ack && !fin && match == 2){
-						conn -> state = SYN_ACK_SENT;
+				case CLOSED:
+					if(syn && !ack && !fin){
+						conn -> state = SYN_RCVD;
 						return NF_ACCEPT;
 					}
-					if(syn && match == 1)
-						return NF_ACCEPT;
-					return NF_DROP;
-				case SYN_ACK_SENT:
-					if(ack && !syn && !fin && match == 1){
+					continue;
+
+				case SYN_SENT:
+					if(syn && ack && !fin){
 						conn -> state = ESTABLISHED;
 						return NF_ACCEPT;
 					}
-					if(syn && ack && !fin && match = 2)
+					continue;
+
+				case SYN_RCVD:
+					if(ack && !syn && !fin){
+						conn -> state = ESTABLISHED;
 						return NF_ACCEPT;
-					return NF_DROP;
+					}
+					continue;
 
 				case ESTABLISHED:
-					if(syn):
+					if(syn)
 						return NF_DROP;
-					if(fin && match == 1){
-						conn -> state = FIN_WAIT_1;
-					}		
-					if(fin && match == 2){
-						conn  -> state = FIN_WAIT_2
+					if(fin){
+						conn -> state = (match == 1 ? CLOSE_WAIT : FIN_WAIT_1);
+						if(no > 0){
+							return NF_ACCEPT;
+						}
+						no ++;
+						continue;
 					}
 					return NF_ACCEPT;
 
 				case FIN_WAIT_1:
 					if(syn)
 						return NF_DROP;
-					if(match == 1 && !(fin && ack) && !ack)
-						return NF_DROP;
+
+					if(ack && fin && match == 1){
+						remove_connection(conn);
+						return NF_ACCEPT;
+					}
 					if(fin && match == 2){
-						conn -> state = LAST_ACK_1; 
+						return NF_ACCEPT; 
+					}
+					if(ack && match == 1){
+						conn -> state = FIN_WAIT_2;
+						return NF_ACCEPT;
+					}
+					if(fin && match == 1){
+						conn -> state = CLOSING;
 					}
 					return NF_ACCEPT;
+
 				case FIN_WAIT_2:
-					if(syn)
-						return NF_DROP;
-					if(match == 2 && !ack && !fin)
+					if(syn || (!ack && match == 2))
 						return NF_DROP;
 					if(fin && match == 1){
-						conn -> state = LAST_ACK_2;
+						remove_connection(conn);
+						return NF_ACCEPT;
 					}
 					return NF_ACCEPT;
-				case LAST_ACK_1:
+
+				case CLOSING:
+					if(syn)
+						return NF_DROP;
+					if(ack && !fin){
+						if(match == 1)
+							remove_connection(conn);
+						return NF_ACCEPT;
+					}
+					return NF_DROP;
+				case CLOSE_WAIT:
+					if(syn || match == 1)
+						return NF_DROP;
+					if(ack){
+						if(fin)
+							conn -> state = LAST_ACK;
+						return NF_ACCEPT;
+						
+					}
+					if(fin){
+						conn -> state = LAST_ACK;
+						return NF_ACCEPT;
+					}
+				case LAST_ACK:
+					if(syn)
+						return NF_DROP;
 					if(ack && match == 1){
 						remove_connection(conn);
 						return NF_ACCEPT;
 					}
 					return NF_DROP;
-				case LAST_ACK_2:
-					if(ack && match  == 2){
-						remove_connection(conn);
-						return NF_ACCEPT;
-					}
-					return NF_DROP;
+				}
+
 		}	
 	}
 	return NF_DROP;
 }
 
-char* conn_string(){
+char* conn_str(void){
 	char* ret = kcalloc(conn_size, sizeof(char) * MAX_ROW_SIZE, GFP_ATOMIC);
-	inc();
+	conn_inc();
 	if(!ret){
 		printk("[firewall] error in kcalloc in conn_string");
 		return NULL;
@@ -119,33 +162,36 @@ ssize_t conn_display(struct device *dev, struct device_attribute *attr, char *bu
 	char* conns = conn_str();
 	int ret = sizeof(conns);
 	strncpy(buf, conns, ret);
-	free(conns);
+	kfree(conns);
+	conn_dec();
 	return ret;        	
 }
 
 void conn_setup(void){
-	conn_lst = kcalloc(DEFAULT_SIZE, sizeof(conn_t*), GFP_ATOMIC);
-	inc();	
+	conn_list = kcalloc(DEFAULT_SIZE, sizeof(conn_t*), GFP_ATOMIC);
+	conn_inc();	
 	conn_size = DEFAULT_SIZE;
 	return;
 }
 
 void conn_clear(void){
 	for(int i = 0; i < conn_size; i++){
-		kfree(conn_lst[i]);
-		dec();
+		kfree(conn_list[i]);
+		conn_dec();
 	}
-	kfree(conn_lst);
-	dec();
+	kfree(conn_list);
+	conn_dec();
 	printk("[firewall] conn_allocnt = %d\n", allocnt);
 	return;
 }
+
 int remove_connection(conn_t* conn){
 	int idx = 0;
 	int i = 0;
 	for(i = 0; i < conn_size; i++, idx ++){
 		if(conn_list[i] == conn){
 			kfree(conn);
+			conn_dec();
 			idx --;
 		}
 		else{
@@ -159,7 +205,7 @@ int remove_connection(conn_t* conn){
 	if(conn_size == conn_arr_size/4){
 		conn_t** old_conn_list = conn_list;
 		conn_list = kcalloc(conn_arr_size/2, sizeof(conn_t*), GFP_ATOMIC);
-		inc();
+		conn_inc();
 		for(int j = 0; j < conn_size; j++){
 			conn_list[j] = old_conn_list[i];
 		}
@@ -168,7 +214,7 @@ int remove_connection(conn_t* conn){
 	return 0;		
 }
 
-int add_new_connection(unsigned int src_ip, int src_port, unsigned int dst_ip, inr dst_port, state_t state){
+int add_new_connection(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, state_t state){
 	conn_t* conn = kcalloc(1, sizeof(conn_t), GFP_ATOMIC);
 	if(!conn){
 		return 1;
@@ -181,7 +227,7 @@ int add_new_connection(unsigned int src_ip, int src_port, unsigned int dst_ip, i
 	if(conn_size == conn_arr_size){
 		conn_t** old_conn_list = conn_list;
 		conn_list = kcalloc(conn_arr_size * 2, sizeof(conn_t*), GFP_ATOMIC);
-		inc();
+		conn_inc();
 		conn_arr_size *= 2;	
 		for(int i = 0; i < conn_size; i++){
 			conn_list[i] = old_conn_list[i];
@@ -192,3 +238,4 @@ int add_new_connection(unsigned int src_ip, int src_port, unsigned int dst_ip, i
 	conn_size ++; 
 	return 0;
 }
+

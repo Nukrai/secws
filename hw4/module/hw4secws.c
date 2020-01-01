@@ -107,7 +107,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
         		}
        			 // log
         		add_log(p);
-        		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT)
+        		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
 			return NF_DROP;
 		}
 		else{
