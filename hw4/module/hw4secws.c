@@ -96,9 +96,13 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
                         		printk("[firewall] error in create_log - returned NULL");
                         		return ret;
                 		}
-                	// log
-                	add_log(p);
-                	return ret;
+                		// log
+                		add_log(p);
+				printk("[before conn table]\n");
+                		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
+	                        add_new_connection(dst_ip, dst_port, src_ip, src_port, CLOSED);
+				printk("[afterconn table]\n");
+				return ret;
         		}
 			        //no rule found - DROP
 		        p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, NF_DROP, REASON_NO_MATCHING_RULE);
@@ -107,7 +111,6 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
         		}
        			 // log
         		add_log(p);
-        		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
 			return NF_DROP;
 		}
 		else{
@@ -261,6 +264,7 @@ device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.att
 		return -1;
 	}
 	//register the hook
+	conn_setup();
 	nf_register_hook(&fo_ops);
 	//init DS's
 	log_reset(NULL, NULL, NULL, 0);
@@ -271,6 +275,7 @@ device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.att
 
 void basic_fw_exit(void){
 	//cleanup
+	conn_clear();
 	log_reset(NULL, NULL, NULL,0);
 	kfree(log_list);
 	dec();
