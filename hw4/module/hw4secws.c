@@ -128,6 +128,10 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 			// log
 			add_log(p);
 			printk("[firewall] static rule check\n");
+			if(ret == NF_ACCEPT){
+				add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
+				add_new_connection(dst_ip, dst_port, src_ip, src_port, SYN_RCVD);
+			}
 			return ret;
 		} 
 		//no rule found - DROP

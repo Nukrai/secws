@@ -2,5 +2,5 @@ cd ~/new_nuki/secws-master/hw4/module;
 sudo rmmod firewall
 make clean; make;
 sudo insmod firewall.ko;
-sudo ../user/main load_rules ~/new_nuki/secws-master/hw4/module/_rules_example.txt
+sudo ../user/main load_rules ~/new_nuki/secws-master/hw4/module/more_rules.txt
 make clean;
