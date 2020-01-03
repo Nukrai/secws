@@ -42,6 +42,7 @@ struct device* reset_dev = NULL;
 
 unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct net_device *in, const struct net_device *out, int (*okfn)(struct sk_buff *)){
 	//get IP layer header
+	struct tcphdr* tcp_header = NULL;
 	struct iphdr *ip_header = (struct iphdr*)skb_network_header(skb);
 	if(ip_header == NULL){
 		printk("[firewall] error in parsing packer");
@@ -69,7 +70,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 
 	}
 	if(ip_header-> protocol == PROT_TCP){ //TCP packet
-		struct tcphdr*  tcp_header= (struct tcphdr *)((__u32 *)ip_header+ ip_header->ihl);
+		tcp_header= (struct tcphdr *)((__u32 *)ip_header+ ip_header->ihl);
 		if(tcp_header == NULL){
 			printk("[firewall] error in parsing TCP");
 		}
@@ -112,7 +113,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	}
 	// search rule for the packet
 	if(ack == 0 || protocol != PROT_TCP){
-	
+		printk("[firewall] rulestable \n");
 		int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
 
 		if(idx >= 0){ // if rule found
@@ -126,6 +127,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 			}
 			// log
 			add_log(p);
+			printk("[firewall] static rule check\n");
 			return ret;
 		} 
 		//no rule found - DROP
@@ -138,12 +140,13 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		return NF_DROP;
 	}
 	else{ // TCP, ack == 1
+		printk("[firewall] conn table \n");
 		int syn = tcp_header -> syn;
                 int fin = tcp_header -> fin;
                 int rst = tcp_header -> rst;
                 unsigned int ret = tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
                 return ret;
-	}
+
 
 	}
 }
@@ -154,7 +157,7 @@ static DEVICE_ATTR(reset, 0222, NULL, log_reset);
 static __init int basic_fw_init(void){
         //hook setup
         fo_ops.hook = forward_hook;
-	fo_ops.hooknum = NF_INET_PRE_ROUTING;
+	fo_ops.hooknum = NF_INET_FORWARD;
 	fo_ops.pf = PF_INET;
         fo_ops.priority = NF_IP_PRI_FIRST;
 	

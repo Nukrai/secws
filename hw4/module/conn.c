@@ -170,7 +170,7 @@ ssize_t conn_display(struct device *dev, struct device_attribute *attr, char *bu
 void conn_setup(void){
 	conn_list = kcalloc(DEFAULT_SIZE, sizeof(conn_t*), GFP_ATOMIC);
 	conn_inc();	
-	conn_size = DEFAULT_SIZE;
+	conn_arr_size = DEFAULT_SIZE;
 	return;
 }
 
