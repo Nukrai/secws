@@ -84,42 +84,6 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 			add_log(p);
 			return NF_DROP;
 		}
-		if(ack == 0){ // TCP syn logic
-			int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
-
-        		if(idx >= 0){ // if rule found TODO: add FTP HTTP logic here
-                		rule_t* found = get(idx);
-                		unsigned int ret = found->action; // NF_ACCEPT or NF_DROP
-                		log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, found -> action, idx);
-
-                		if(p == NULL){
-                        		printk("[firewall] error in create_log - returned NULL");
-                        		return ret;
-                		}
-                		// log
-                		add_log(p);
-				printk("[before conn table]\n");
-                		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
-	                        add_new_connection(dst_ip, dst_port, src_ip, src_port, CLOSED);
-				printk("[afterconn table]\n");
-				return ret;
-        		}
-			        //no rule found - DROP
-		        p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, NF_DROP, REASON_NO_MATCHING_RULE);
-        		if(p == NULL){
-                		printk("[firewall] error in create_log- returned NULL");
-        		}
-       			 // log
-        		add_log(p);
-			return NF_DROP;
-		}
-		else{
-			int syn = tcp_header -> syn;
-			int fin = tcp_header -> fin;
-			int rst = tcp_header -> rst;
-			unsigned int ret = tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
-			return ret;
-		}
 	}
 	// find direction
 	if(in != NULL && out != NULL){
@@ -147,29 +111,41 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		return NF_ACCEPT;
 	}
 	// search rule for the packet
-	int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
+	if(ack == 0 || protocol != PROT_TCP){
+	
+		int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
 
-	if(idx >= 0){ // if rule found
-		rule_t* found = get(idx);
-		unsigned int ret = found->action; // NF_ACCEPT or NF_DROP
-		log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, found -> action, idx);
+		if(idx >= 0){ // if rule found
+			rule_t* found = get(idx);
+			unsigned int ret = found->action; // NF_ACCEPT or NF_DROP
+			log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, found -> action, idx);
 		
-		if(p == NULL){
-			printk("[firewall] error in create_log - returned NULL");
+			if(p == NULL){
+				printk("[firewall] error in create_log - returned NULL");
+				return ret;
+			}
+			// log
+			add_log(p);
 			return ret;
+		} 
+		//no rule found - DROP
+        	p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, NF_DROP, REASON_NO_MATCHING_RULE);
+        	if(p == NULL){
+			printk("[firewall] error in create_log- returned NULL");
 		}
 		// log
 		add_log(p);
-		return ret;
-	} 
-	//no rule found - DROP
-        p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, NF_DROP, REASON_NO_MATCHING_RULE);
-        if(p == NULL){
-		printk("[firewall] error in create_log- returned NULL");
+		return NF_DROP;
 	}
-	// log
-	add_log(p);
-	return NF_DROP;
+	else{ // TCP, ack == 1
+		int syn = tcp_header -> syn;
+                int fin = tcp_header -> fin;
+                int rst = tcp_header -> rst;
+                unsigned int ret = tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
+                return ret;
+	}
+
+	}
 }
 
 static DEVICE_ATTR(rules, 0666, ruler_display, ruler_modify);
@@ -178,7 +154,7 @@ static DEVICE_ATTR(reset, 0222, NULL, log_reset);
 static __init int basic_fw_init(void){
         //hook setup
         fo_ops.hook = forward_hook;
-	fo_ops.hooknum = NF_INET_FORWARD;
+	fo_ops.hooknum = NF_INET_PRE_ROUTING;
 	fo_ops.pf = PF_INET;
         fo_ops.priority = NF_IP_PRI_FIRST;
 	
