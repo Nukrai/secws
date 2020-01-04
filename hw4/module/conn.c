@@ -64,6 +64,9 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 						printk("[firewall] conn *changed* to EST\n");
 						return NF_ACCEPT;
 					}
+					if(fin && match == 2){
+						conn -> state = FIN_WAIT_1;
+					}
 					continue;
 
 				case ESTABLISHED:
