@@ -8,6 +8,9 @@ RULES_TEMP_PATH = "/tmp/firewall_temp_ldvsvsnvbub"
 RESET_PATH = "/sys/class/fw/log/reset" 
 LOG_PATH =   "/dev/fw_log"
 RULES_PATH = "/sys/class/fw/rules/rules"
+CONN_PATH = "/sys/class/fw/conns/conns"
+
+USAGE = "Usage: {0} show_rules OR {0} load_rules <path_to_rules> OR {0} show_log OR {0} clear_log OR {0} show_conns"
 
 LOG_HEADER =	["timestamp                     ",
 		 "src_ip                        ",
@@ -20,7 +23,8 @@ LOG_HEADER =	["timestamp                     ",
 		 "reason                        ",
 		 "count\n"]
 
-commands = ["show_rules", "load_rules", "show_log", "clear_log"]
+commands = ["show_rules", "load_rules", "show_log", "clear_log", "show_conns"]
+state = {"0":"CLOSED", "1":"SYN_SENT", "2":"SYN_RCVD", "4":"ESTABLISHED", "5":"FIN_WAIT_1", "6":"FIN_WAIT_2", "7":"CLOSING", "8":"CLOSE_WAIT", "9":"LAST_ACK","10":"FTP_OPEN"}
 
 direction = {"any":"3", "in":"1", "out":"2"}
 idirection = {direction[x] : x for x in direction} 
@@ -53,6 +57,16 @@ def ip2int(addr):
 
 def int2ip(addr):
 	return ".".join(socket.inet_ntoa(struct.pack("!I", addr)).split(".")[::-1])
+def conn_unparse(conns):
+	lines = conns.split("\n")
+	ret = ""
+	for line in lines:
+		args = line.split(" ")
+		args[0] = int2ip(int(args[0]))
+		args[2] = int2ip(int(args[2]))
+		args[4] = state[args[4]]
+		ret += "{0} {1} {2} {3} {4}\n".format(*tuple(args))
+	return ret[:-1]
 
 # see https://stackoverflow.com/questions/4770297/convert-utc-datetime-string-to-local-datetime
 def utc_to_local(utc_datetime):
@@ -60,6 +74,7 @@ def utc_to_local(utc_datetime):
     offset = dt.datetime.fromtimestamp(now_timestamp) - dt.datetime.utcfromtimestamp(now_timestamp)
     return utc_datetime + offset
 # from rules file to the kernel module format
+
 def parse(rules):
 	lines = rules.split("\n")
 	ret = ""
@@ -128,12 +143,12 @@ def unlog(log):
 
 # wrong no. of args
 if(len(sys.argv) != 2 and not(len(sys.argv) == 3 and sys.argv[1] == commands[1])):
-	print("Usage: [./main show_rules] OR [./main load_rules <path_to_rules>] OR [./main show_log] OR ./main clear_log")
+	print(USAGE.format(sys.argv[0]))
 	exit(-1)
 command = sys.argv[1]
 #not a valid command
 if(command not in commands):
-	print("Usage: [./main show_rules] OR [./main load_rules <path_to_rules>] OR [./main show_log] OR ./main clear_log")
+	print(USAGE.format(sys.argv[0]))
 	exit(-1);
 if(command == commands[0]): # show_rules
 	with open(RULES_PATH, "r") as f:
@@ -159,3 +174,7 @@ if(command == commands[2]): # show_log
 
 if(command == commands[3]): # clear log
 	system('echo "0" > {0}'.format(RESET_PATH))	
+if(command == commands[4]): #show_conns
+	proc = subprocess.Popen(["cat", CONN_PATH], stdout=subprocess.PIPE)
+	log = proc.communicate()[0].decode("utf-8")
+	print(conn_unparse(log))
