@@ -53,8 +53,7 @@ typedef enum {
 typedef enum {
 	MINOR_RULES    = 0,
 	MINOR_LOG      = 1,
-	MINOR_RESET    = 2,
-	MINOR_CONN     = 3,
+	MINOR_CONN     = 2,
 } minor_t;
 
 typedef enum {
