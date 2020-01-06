@@ -166,9 +166,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 }
 
 char* conn_str(){
-	if(conn_size == 0)
-		return NULL;
-	char* str = kcalloc(conn_size , sizeof(char) * MAX_ROW_SIZE, GFP_ATOMIC);
+	char* str = kmalloc(conn_size * MAX_ROW_SIZE, GFP_ATOMIC);
 	printk("[conn_di START %p]\n", str);
 	//return NULL;
 	conn_inc();

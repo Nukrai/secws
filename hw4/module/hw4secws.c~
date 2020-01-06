@@ -160,7 +160,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 
 static DEVICE_ATTR(rules, 0666, ruler_display, ruler_modify);
 static DEVICE_ATTR(reset, 0222, NULL, log_reset);
-static DEVICE_ATTR(conns, 0444, conn_display, NULL);
+static DEVICE_ATTR(conn, 0444, conn_display, NULL);
 
 static __init int basic_fw_init(void){
         //hook setup
@@ -279,7 +279,7 @@ device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.att
                 unregister_chrdev(major_number, CLASS_NAME "_" DEVICE_NAME_LOG);
                 return -1;
         }
-	if(device_create_file(conn_dev, (const struct device_attribute*)&dev_attr_conns.attr)){
+	if(device_create_file(conn_dev, (const struct device_attribute*)&dev_attr_conn.attr)){
                 printk("[firewall] conn device reg' fail\n");
 		device_destroy(fw_class, MKDEV(major_number, MINOR_CONN)); //!!
                 //class_destroy(conn_class);
@@ -297,8 +297,6 @@ device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.att
 
 	//register the hook
 	conn_setup();
-	add_new_connection(0,0,0,0,SYN_RCVD);
-	add_new_connection(0,0,0,0,SYN_SENT);
 	nf_register_hook(&fo_ops);
 	//init DS's
 	log_reset(NULL, NULL, NULL, 0);
@@ -317,9 +315,9 @@ void basic_fw_exit(void){
 		kfree(&rule_list[i]);
 	}
 	// device cleanup
-	device_remove_file(conn_dev, (const struct device_attribute *)&dev_attr_conns.attr);
-	device_destroy(fw_class, MKDEV(major_number, MINOR_CONN));
-        //class_destroy(conn_class);
+	device_remove_file(conn_dev, (const struct device_attribute *)&dev_attr_conn.attr);
+	device_destroy(conn_class, MKDEV(major_number, MINOR_CONN));
+        class_destroy(conn_class);
 	device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.attr);
 	device_remove_file(reset_dev, (const struct device_attribute*)&dev_attr_reset.attr);	
 	device_destroy(fw_class, MKDEV(major_number, MINOR_RULES));

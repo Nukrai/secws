@@ -1,10 +1,10 @@
 #include "fw.h"
 #include "conn.h"
 
-void conn_inc(){
+void conn_inc(void){
 	allocnt++;
 }
-void conn_dec(){
+void conn_dec(void){
 	allocnt--;
 }
 
@@ -165,39 +165,32 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 	return NF_DROP;
 }
 
-char* conn_str(){
-	if(conn_size == 0)
-		return NULL;
-	char* str = kcalloc(conn_size , sizeof(char) * MAX_ROW_SIZE, GFP_ATOMIC);
-	printk("[conn_di START %p]\n", str);
-	//return NULL;
+char* conn_str(void){
+	char* ret = kcalloc(conn_size, sizeof(char) * MAX_ROW_SIZE, GFP_ATOMIC);
+	printk("[conn_di START]\n");
 	conn_inc();
-	if(!str){
+	if(!ret){
 		printk("[firewall] error in kcalloc in conn_string");
 		return NULL;
 	}
 	char line[MAX_ROW_SIZE];
 	line[0] = '\0';
 	conn_t* conn;
-	printk("FORLOOP %p\n", str);
+	printk("FORLOOP\n");
 	for(int i = 0; i < conn_size; i++){
 		if(i > 0)
-			str = strcat(str, "\n");
+			ret = strcat(ret, "\n");
 		conn = conn_list[i];
 		sprintf(line, "%u %d %u %d %hhu", conn -> src_ip, conn -> src_port, conn -> dst_ip, conn -> dst_port, conn -> state);
-		str = strcat(str, line);
-		printk("forloop iteration %d %p\n", i, str);
+		ret = strcat(ret, line);
 	}
 	printk("RETURN\n");
-	return str;	
+	return ret;	
 }
 
 ssize_t conn_display(struct device *dev, struct device_attribute *attr, char *buf){
 	printk("STATING\n");
 	char* conns = conn_str();
-	if(!conns){
-		return 0;	
-	}
 	printk("[firew] %s %p\n", conns, conns);
 	int ret = strlen(conns);
 	strncpy(buf, conns, ret);
