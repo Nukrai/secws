@@ -31,6 +31,8 @@ static int allocnt = 0;
 
 static conn_t ftp_connection;
 
+conn_t* get_ftp20(void);
+
 unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst);
 
 int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int fin, int rst, conn_t* conn);

@@ -8,6 +8,10 @@ void conn_dec(void){
 	allocnt--;
 }
 
+conn_t* get_ftp20(void){
+	return &ftp_connection;
+}
+
 ssize_t ftp_display(struct device *dev, struct device_attribute *attr, char *buf){
 	buf[0] = '\0';
 	sprintf(buf, "%u %d %u %d",
