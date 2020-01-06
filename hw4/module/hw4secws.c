@@ -13,6 +13,7 @@
 #include <linux/tcp.h>
 #include <linux/skbuff.h>
 #include <linux/fcntl.h>
+#include <net/tcp.h>
 
 //netfilter API
 
@@ -160,9 +161,16 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	if(protocol != PROT_TCP && protocol != PROT_ICMP && protocol != PROT_UDP){ // other protocols, ignore
 		return NF_ACCEPT;
 	}
+
+	int is_ftp20 = 0;
+	if(ack == 0 && protocol ==  PROT_TCP){
+		int syn = tcp_header -> syn;
+		int fin = tcp_header -> fin;
+		int rst = tcp_header -> rst;
+		is_ftp20 = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, get_ftp20());
+	}
 	// search rule for the packet
-	if((ack == 0 &&	is_matching(src_ip, src_port, dst_ip, dst_port,
-		syn, fin, rst, get_ftp20()) == 0) || protocol != PROT_TCP){
+	if((ack == 0 &&	is_ftp20 == 0) || protocol != PROT_TCP){
 		
 		printk("[firewall] rulestable \n");
 		int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
@@ -204,11 +212,11 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 			return ret;
 		if(tcp_header -> dest == htons(80) || tcp_header -> dest == htons(21)){
 			//changing of routing
-			ip_header->daddr = MY_IP; //change to my ip
+			ip_header->daddr = direction == DIRECTION_IN ? MY_IP_IN : MY_IP_OUT; //change to my ip
 			tcp_header->dest = (tcp_header->dest == htons(80) ?
-			  HTTP_PROXY_PORT : FTP_PROXY_PORT; // to proxy port
+			 HTTP_PROXY_PORT : FTP_PROXY_PORT); // to proxy port
 			//here start the fix of checksum for both IP and TCP
-			tcplen = (skb->len - ((ip_header->ihl )<< 2));
+			int tcplen = (skb->len - ((ip_header->ihl )<< 2));
 			tcp_header -> check = 0;
 			tcp_header -> check = tcp_v4_check(tcplen, ip_header->saddr, ip_header -> daddr, csum_partial((char*)tcp_header, tcplen, 0));
 			skb->ip_summed = CHECKSUM_NONE; //stop offloading

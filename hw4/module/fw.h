@@ -47,9 +47,10 @@ typedef enum {
 // auxiliary values, for your convenience
 #define IP_VERSION		(4)
 #define PORT_ANY		(0)
-#define PORT_ABOVE_1023	(1023)
+#define PORT_ABOVE_1023		(1023)
 #define MAX_RULES		(50)
-
+#define MY_IP_IN   		(0x301010a)
+#define MY_IP_OUT   		(0x302010a)
 // device minor numbers, for your convenience
 typedef enum {
 	MINOR_RULES    = 0,

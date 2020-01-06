@@ -51,6 +51,7 @@ def ip2int(addr):
 		raise Exception()
 	return str(struct.unpack("!I", socket.inet_aton(addr[0]))[0]) + " " + addr[1]
 
+
 def int2ip(addr):
 	return ".".join(socket.inet_ntoa(struct.pack("!I", addr)).split(".")[::-1])
 
