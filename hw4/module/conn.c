@@ -70,18 +70,15 @@ int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_
 unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst){
 	conn_t* conn;
 	int match;
-	int no = 0;
+	unsigned int ret = NF_DROP;
 	for(int i = 0 ; i < conn_size; ++i){
 		printk("[firewall] checking conn number %d, src port %d, syn=%d, ack=%d, fin=%d, rst=%d\n",i, src_port,syn,ack,fin,rst);
 		conn = conn_list[i];
 		if((match = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, conn)) != 0){
 			if(rst){
 				remove_connection(conn);
-				if(no > 0){
-					return NF_ACCEPT;
-				}
-				// 
-				no ++;
+				i--;
+				ret =  NF_ACCEPT;
 				continue;
 			}
 			switch(conn -> state){
@@ -89,7 +86,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 					printk("[firewall] conn state: CLOSED\n");
 					if(syn && !ack && !fin){
 						conn -> state = (match == 1 ? SYN_RCVD : SYN_SENT);
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
 					}
 					continue;
 
@@ -98,7 +95,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 					if(syn && ack && !fin){
 						conn -> state = ESTABLISHED;
 						printk("[firewall] conn *changed* to EST\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
 					}
 					continue;
 
@@ -107,7 +104,8 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 					if(ack && !syn && !fin){
 						conn -> state = ESTABLISHED;
 						printk("[firewall] conn *changed* to EST\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
+						continue;
 					}
 					if(fin && match == 2){
 						conn -> state = FIN_WAIT_1;
@@ -117,97 +115,112 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 				case ESTABLISHED:
 					printk("[firewall] conn state: EST\n");
 					if(syn)
-						return NF_DROP;
+						continue;
 					if(fin){
 						conn -> state = (match == 1 ? CLOSE_WAIT : FIN_WAIT_1);			
 						printk("[firewall] conn *changed* to %s\n", ((match == 1) ? "CLOSE_WAIT" : "FIN_WAIT_1"));
-						if(no > 0){
-							return NF_ACCEPT;
-						}
-						no ++;
+						ret = NF_ACCEPT;
 						continue;
 					}
-					return NF_ACCEPT;
+					ret = NF_ACCEPT;
+					continue;
 
 				case FIN_WAIT_1:
 					printk("[firewall] conn state: f1\n");
 					if(syn)
-						return NF_DROP;
+						continue;
 
 					if(ack && fin && match == 1){
 						remove_connection(conn);
+						i--;
 						printk("[firewall] conn CLOSED!\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
+						continue;
 					}
 					if(fin && match == 2){
-						return NF_ACCEPT; 
+						ret = NF_ACCEPT; 
+						continue;
 					}
 					if(ack && match == 1){
 						conn -> state = FIN_WAIT_2;
 						printk("[firewall] conn *changed* to FIN_WAIT_2\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
+						continue;
 					}
 					if(fin && match == 1){
 						conn -> state = CLOSING;
 						printk("[firewall] conn *changed* to CLOSING\n");
 					}
-					return NF_ACCEPT;
+					ret = NF_ACCEPT;
+					continue;
 
 				case FIN_WAIT_2:
 					printk("[firewall] conn state: f2\n");
 					if(syn || (!ack && match == 2))
-						return NF_DROP;
+						continue;
 					if(fin && match == 1){
 						remove_connection(conn);
+						i--;
 						printk("[firewall] conn CLOSED!\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
 					}
-					return NF_ACCEPT;
+					ret = NF_ACCEPT;
+					continue;
 
 				case CLOSING:
 					printk("[firewall] conn state: closing\n");
 					if(syn)
-						return NF_DROP;
+						continue;
 					if(ack && !fin){
 						if(match == 1){
+							i--;
 							remove_connection(conn);
 							printk("[firewall] conn CLOSED!\n");
 						}
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
 					}
-					return NF_DROP;
+					continue;
+
 				case CLOSE_WAIT:
 					printk("[firewall] conn state: close wait\n");
-					if(syn || match == 1)
-						return NF_DROP;
+					if(syn)
+						continue;
+					if(match == 1){
+						if(ack)
+							ret = NF_ACCEPT;
+						continue;
+					}
 					if(ack){
 						if(fin){
 							conn -> state = LAST_ACK;
 							printk("[firewall] conn *changed* to LASK_ACK\n");
 						}
-						return NF_ACCEPT;
-						
+						ret = NF_ACCEPT;
+						continue;
 					}
 					if(fin){
 						conn -> state = LAST_ACK;
 						printk("[firewall] conn *changed* to LAST_ACK\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
 					}
+					continue;
 				case LAST_ACK:
 					printk("[firewall] conn state: last_ack\n");
 					if(syn)
-						return NF_DROP;
+						continue;
 					if(ack && match == 1){
 						remove_connection(conn);
+						i--;
 						printk("[firewall] conn CLOSED!\n");
-						return NF_ACCEPT;
+						ret = NF_ACCEPT;
+						continue;
 					}
-					return NF_DROP;
+					continue;
 				}
 
 		}	
 	}
-	return NF_DROP;
+	return ret;
 }
 
 char* conn_str(){
@@ -286,7 +299,7 @@ int remove_connection(conn_t* conn){
 		return 1;
 
 	conn_size --;
-	if(conn_size == conn_arr_size/4){
+	if(conn_size == conn_arr_size/4 && conn_size > 10){
 		conn_t** old_conn_list = conn_list;
 		conn_list = kcalloc(conn_arr_size/2, sizeof(conn_t*), GFP_ATOMIC);
 		conn_inc();

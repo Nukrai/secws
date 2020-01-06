@@ -102,6 +102,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	int src_port = PORT_ANY;
 	int dst_port = PORT_ANY;
 	int ack = ACK_ANY;
+	int syn;
 	direction_t direction;
 	log_piece* p;
 	unsigned char protocol = ip_header -> protocol;
@@ -125,6 +126,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		}
                 src_port = ntohs(tcp_header -> source);
                 dst_port = ntohs(tcp_header -> dest);
+		syn = tcp_header -> syn;
 		ack = tcp_header -> ack; //ntohl(tcp_header -> ack);
 		if((tcp_header -> psh) && (tcp_header -> urg) && (tcp_header -> fin)){ // XMAS packet
 			log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, PROT_TCP, 0, NF_DROP, REASON_XMAS_PACKET);
@@ -163,14 +165,14 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	}
 
 	int is_ftp20 = 0;
-	if(ack == 0 && protocol ==  PROT_TCP){
-		int syn = tcp_header -> syn;
+	if(syn == 1 && ack == 0 && protocol ==  PROT_TCP){
+		syn = tcp_header -> syn;
 		int fin = tcp_header -> fin;
 		int rst = tcp_header -> rst;
 		is_ftp20 = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, get_ftp20());
 	}
 	// search rule for the packet
-	if((ack == 0 &&	is_ftp20 == 0) || protocol != PROT_TCP){
+	if((syn == 1 && ack == 0 && is_ftp20 == 0) || protocol != PROT_TCP){
 		
 		printk("[firewall] rulestable \n");
 		int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
@@ -314,8 +316,6 @@ static __init int basic_fw_init(void){
 
 	//register the hook
 	conn_setup();
-	add_new_connection(0,0,0,0,SYN_RCVD);
-	add_new_connection(0,0,0,0,SYN_SENT);
 	nf_register_hook(&fo_ops);
 	//init DS's
 	log_reset(NULL, NULL, NULL, 0);
