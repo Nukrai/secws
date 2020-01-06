@@ -30,26 +30,33 @@ static struct file_operations logps = {
 };
 
 struct nf_hook_ops fo_ops;
+
 int major_number;
 int log_major_number;
+
 unsigned int loopback = 16777343;
-struct class* fw_class = NULL;
+struct class* fw_class 	= NULL;
 struct class* log_class = NULL;
 
-int rules_file = 0;
-int conn_file = 0;
-int reset_file = 0;
+int rules_file 	= 0;
+int conn_file 	= 0;
+int reset_file 	= 0;
+int ftp_file 	= 0;
 
-struct device* rule_dev = NULL;
-struct device* log_dev = NULL;
-struct device* reset_dev = NULL;
-struct device* conn_dev = NULL;
+struct device* rule_dev	= NULL;
+struct device* log_dev	= NULL;
+struct device* reset_dev= NULL;
+struct device* conn_dev	= NULL;
+struct device* ftp_dev 	= NULL;
 
 static DEVICE_ATTR(rules, 0666, ruler_display, ruler_modify);
 static DEVICE_ATTR(reset, 0222, NULL, log_reset);
+static DEVICE_ATTR(ftp, 0666, ftp_display, ftp_modify);
 static DEVICE_ATTR(conns, 0444, conn_display, NULL);
 
 void clean(void){
+	if(!ftp_file)
+		device_remove_file(ftp_dev, (const struct device_attribute*)&dev_attr_ftp.attr);
 	if(!rules_file)
 		device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.attr);
 	if(!reset_file)
@@ -57,6 +64,8 @@ void clean(void){
 	if(!conn_file)
 		device_remove_file(conn_dev, (const struct device_attribute*)&dev_attr_conns.attr);
 	
+	if(ftp_dev != NULL && !IS_ERR(ftp_dev))
+		device_destroy(fw_class, MKDEV(major_number, MINOR_FTP));
 	if(rule_dev != NULL && !IS_ERR(rule_dev))
 		device_destroy(fw_class, MKDEV(major_number, MINOR_RULES));
 	if(reset_dev != NULL && !IS_ERR(reset_dev))
@@ -117,7 +126,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		ack = tcp_header -> ack; //ntohl(tcp_header -> ack);
 		if((tcp_header -> psh) && (tcp_header -> urg) && (tcp_header -> fin)){ // XMAS packet
 			log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, PROT_TCP, 0, NF_DROP, REASON_XMAS_PACKET);
-			if(p==NULL){
+			if(p == NULL){
 				printk("[firewall][null log piece]");
 			}
 			add_log(p);
@@ -125,12 +134,13 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		}
 	}
 	// find direction
-	if(in != NULL && out != NULL){
-		if(!(strlen(in -> name) == 4 && strlen(out -> name) == 4)){
+	if(in != NULL){ //&& out != NULL){ // for change to pre routing
+		if(!(strlen(in -> name) == 4)){// && strlen(out -> name) == 4)){
 			direction = -1;	
 		}
 		else{
-			direction = !strncmp(out -> name, "eth2", 4) ? DIRECTION_OUT : !strncmp(out -> name, "eth1", 4) ? DIRECTION_IN : -1;
+			direction = !strncmp(in -> name, "eth1", 4) ? DIRECTION_OUT : !strncmp(in -> name, "eth2", 4) ? DIRECTION_IN : -1;
+			 // changed by the move to pre routing
 		}
 	}
 	else{
@@ -253,16 +263,27 @@ static __init int basic_fw_init(void){
 		clean();
 		return -1;
 	}
-	conn_dev =  device_create(fw_class, NULL, MKDEV(major_number, MINOR_CONN), NULL, CONN_NAME);
+	conn_dev = device_create(fw_class, NULL, MKDEV(major_number, MINOR_CONN), NULL, CONN_NAME);
 	if(IS_ERR(conn_dev)){
                 printk("[firewall] conn device reg' fail\n");
                 clean();
 		return -1;
         }
 	if((conn_file = device_create_file(conn_dev, (const struct device_attribute*)&dev_attr_conns.attr))){
-                printk("[firewall] conn device reg' fail\n");
+                printk("[firewall] conn device file reg' fail\n");
                 clean();
 		return -1;
+        }
+	ftp_dev = device_create(fw_class, NULL, MKDEV(major_number, MINOR_FTP), NULL, DEVICE_NAME_FTP);
+	if(IS_ERR(conn_dev)){
+		clean();
+                printk("[firewall] ftp device reg' fail\n");
+		return -1;
+	}
+	if((ftp_file = device_create_file(ftp_dev, (const struct device_attribute*)&dev_attr_ftp.attr))){
+                printk("[firewall] ftp device file reg' fail\n");
+                clean();
+                return -1;
         }
 
 	//register the hook

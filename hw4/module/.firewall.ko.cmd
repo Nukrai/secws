@@ -1,1 +1,0 @@
-cmd_/home/fw/new_nuki/secws-master/hw4/module/firewall.ko := ld -r -m elf_i386 -T /usr/src/linux-headers-3.2.0-37-generic-pae/scripts/module-common.lds --build-id  -o /home/fw/new_nuki/secws-master/hw4/module/firewall.ko /home/fw/new_nuki/secws-master/hw4/module/firewall.o /home/fw/new_nuki/secws-master/hw4/module/firewall.mod.o

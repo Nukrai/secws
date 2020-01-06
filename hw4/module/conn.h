@@ -1,4 +1,3 @@
-
 #define FTP_PROXY_PORT 210
 #define HTTP_PROXY_PORT 800
 #define DEFAULT_SIZE 10
@@ -30,15 +29,21 @@ static int conn_size = 0;
 static int conn_arr_size = DEFAULT_SIZE;
 static int allocnt = 0;
 
+static conn_t ftp_connection;
+
 unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst);
 
-int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int fin, int rst, conn_t* conn);
+int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int fin, int rst, conn_t* conn);
 
 int add_new_connection(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, state_t state);
 
 int remove_connection(conn_t* conn);
 
 ssize_t conn_display(struct device *dev, struct device_attribute *attr, char *buf);
+
+ssize_t ftp_display(struct device *dev, struct device_attribute *attr, char *buf);
+ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
+
 
 char* conn_str(void);
 

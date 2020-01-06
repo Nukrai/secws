@@ -1,16 +1,57 @@
 #include "fw.h"
 #include "conn.h"
 
-void conn_inc(){
+void conn_inc(void){
 	allocnt++;
 }
-void conn_dec(){
+void conn_dec(void){
 	allocnt--;
 }
 
-int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int fin, int rst, conn_t* conn){
+ssize_t ftp_display(struct device *dev, struct device_attribute *attr, char *buf){
+	buf[0] = '\0';
+	sprintf(buf, "%u %d %u %d",
+		ftp_connection.src_ip,
+		ftp_connection.src_port,
+		ftp_connection.dst_ip,
+		ftp_connection.dst_port
+	
+	);
+	return strlen(buf);
+}
+
+ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+	char*  str = kmalloc(count, GFP_ATOMIC);
+        char* free_str = str;
+        conn_inc();
+        char* l;
+        int i = 0;
+        rule_num = 0;
+	unsigned int src_ip;
+	unsigned int dst_ip;
+	int src_port;
+	int dst_port;
+
+	strncpy(str, buf, count);
+	i = sscanf(str, "%u %d %u %d", &src_ip, &src_port, &dst_ip, &dst_port);
+	if(i < 4 && i >= 0){
+		return count;
+	}
+
+	add_new_connection(src_ip, src_port, dst_ip, dst_port, CLOSED);
+	add_new_connection(dst_ip, dst_port, src_ip, src_port, CLOSED);
+	ftp_connection.src_ip = src_ip;
+	ftp_connection.dst_ip = dst_ip;
+	ftp_connection.src_port = src_ip;
+	ftp_connection.dst_port = dst_port;
+	return count;
+}
+
+
+int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int fin, int rst, conn_t* conn){
 	if(src_ip == conn -> src_ip && src_port == conn -> src_port &&
-	   dst_ip == conn -> dst_ip && dst_port == conn -> dst_port && (rst || fin)){
+	   dst_ip == conn -> dst_ip && dst_port == conn -> dst_port &&
+	   (rst || fin || (conn -> state == CLOSED && syn) )){
 		return 2;
 	}
 	//listen  to rst's in opposite direction 
@@ -29,7 +70,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 	for(int i = 0 ; i < conn_size; ++i){
 		printk("[firewall] checking conn number %d, src port %d, syn=%d, ack=%d, fin=%d, rst=%d\n",i, src_port,syn,ack,fin,rst);
 		conn = conn_list[i];
-		if((match = is_matching(src_ip, src_port, dst_ip, dst_port, fin, rst, conn)) != 0){
+		if((match = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, conn)) != 0){
 			if(rst){
 				remove_connection(conn);
 				if(no > 0){
@@ -43,7 +84,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 				case CLOSED:
 					printk("[firewall] conn state: CLOSED\n");
 					if(syn && !ack && !fin){
-						conn -> state = SYN_RCVD;
+						conn -> state = (match == 1 ? SYN_RCVD : SYN_SENT);
 						return NF_ACCEPT;
 					}
 					continue;

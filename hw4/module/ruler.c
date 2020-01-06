@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/fs.h>
+
 rule_t* get(int idx){ //get rule_list[idx] if present, else NULL
 	if(idx >= 0 && idx < rule_num){
 		return &rule_list[idx];

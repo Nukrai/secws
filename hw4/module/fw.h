@@ -33,15 +33,16 @@ typedef enum {
 	
 
 // auxiliary strings, for your convenience
-#define DEVICE_NAME_RULES			"rules"
-#define DEVICE_NAME_LOG				"log"
-#define DEVICE_NAME_CONN_TAB		"conn_tab"
-#define DEVICE_NAME_RESET	"reset"
-#define CLASS_NAME					"fw"
-#define LOOPBACK_NET_DEVICE_NAME	"lo"
-#define IN_NET_DEVICE_NAME			"eth1"
-#define OUT_NET_DEVICE_NAME			"eth2"
-#define CONN_NAME 			"conns"
+#define DEVICE_NAME_RULES	 "rules"
+#define DEVICE_NAME_LOG		 "log"
+#define DEVICE_NAME_CONN_TAB	 "conn_tab"
+#define DEVICE_NAME_RESET	 "reset"
+#define DEVICE_NAME_FTP 	 "ftp"
+#define CLASS_NAME		 "fw"
+#define LOOPBACK_NET_DEVICE_NAME "lo"
+#define IN_NET_DEVICE_NAME	 "eth1"
+#define OUT_NET_DEVICE_NAME	 "eth2"
+#define CONN_NAME 		 "conns"
 
 // auxiliary values, for your convenience
 #define IP_VERSION		(4)
@@ -54,6 +55,7 @@ typedef enum {
 	MINOR_RULES    = 0,
 	MINOR_LOG      = 1,
 	MINOR_CONN     = 2,
+	MINOR_FTP      = 3,
 } minor_t;
 
 typedef enum {
