@@ -35,10 +35,13 @@ int log_major_number;
 unsigned int loopback = 16777343;
 struct class* fw_class = NULL;
 struct class* log_class = NULL;
+struct class* conn_class = NULL;
+
 
 struct device* rule_dev = NULL;
 struct device* log_dev = NULL;
 struct device* reset_dev = NULL;
+struct device* conn_dev = NULL;
 
 unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct net_device *in, const struct net_device *out, int (*okfn)(struct sk_buff *)){
 	//get IP layer header
@@ -157,6 +160,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 
 static DEVICE_ATTR(rules, 0666, ruler_display, ruler_modify);
 static DEVICE_ATTR(reset, 0222, NULL, log_reset);
+static DEVICE_ATTR(conn, 0444, conn_display, NULL);
 
 static __init int basic_fw_init(void){
         //hook setup
@@ -246,6 +250,51 @@ device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.att
 		unregister_chrdev(major_number, CLASS_NAME "_" DEVICE_NAME_LOG);
 		return -1;
 	}
+//	conn_class = class_create(THIS_MODULE, CONN_NAME);
+//	if(IS_ERR(conn_class)){
+//		printk("[firewall] conn class reg' fail\n");
+//		device_destroy(log_class, MKDEV(log_major_number, MINOR_LOG));
+///		device_remove_file(reset_dev, (const struct device_attribute*)&dev_attr_reset.attr);
+//                device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.attr);
+ //               device_destroy(fw_class, MKDEV(major_number, MINOR_LOG));
+  //              device_destroy(fw_class, MKDEV(major_number, MINOR_RULES));
+    //            class_destroy(fw_class);
+     //           unregister_chrdev(major_number, CLASS_NAME);
+      //          class_destroy(log_class);
+       //         unregister_chrdev(major_number, CLASS_NAME "_" DEVICE_NAME_LOG);
+//		return -1;
+//	}
+	conn_dev =  device_create(fw_class, NULL, MKDEV(major_number, MINOR_CONN), NULL, CONN_NAME);
+	if(IS_ERR(conn_dev)){
+                printk("[firewall] conn device reg' fail\n");
+		//class_destroy(conn_class);
+                device_destroy(log_class, MKDEV(log_major_number, MINOR_LOG));
+                device_remove_file(reset_dev, (const struct device_attribute*)&dev_attr_reset.attr);
+                device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.attr);
+                device_destroy(fw_class, MKDEV(major_number, MINOR_LOG));
+                device_destroy(fw_class, MKDEV(major_number, MINOR_RULES));
+                class_destroy(fw_class);
+                unregister_chrdev(major_number, CLASS_NAME);
+                class_destroy(log_class);
+                unregister_chrdev(major_number, CLASS_NAME "_" DEVICE_NAME_LOG);
+                return -1;
+        }
+	if(device_create_file(conn_dev, (const struct device_attribute*)&dev_attr_conn.attr)){
+                printk("[firewall] conn device reg' fail\n");
+		device_destroy(fw_class, MKDEV(major_number, MINOR_CONN)); //!!
+                //class_destroy(conn_class);
+                device_destroy(log_class, MKDEV(log_major_number, MINOR_LOG));
+                device_remove_file(reset_dev, (const struct device_attribute*)&dev_attr_reset.attr);
+                device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.attr);
+                device_destroy(fw_class, MKDEV(major_number, MINOR_LOG));
+                device_destroy(fw_class, MKDEV(major_number, MINOR_RULES));
+                class_destroy(fw_class);
+                unregister_chrdev(major_number, CLASS_NAME);
+                class_destroy(log_class);
+                unregister_chrdev(major_number, CLASS_NAME "_" DEVICE_NAME_LOG);
+                return -1;
+        }
+
 	//register the hook
 	conn_setup();
 	nf_register_hook(&fo_ops);
@@ -266,6 +315,9 @@ void basic_fw_exit(void){
 		kfree(&rule_list[i]);
 	}
 	// device cleanup
+	device_remove_file(conn_dev, (const struct device_attribute *)&dev_attr_conn.attr);
+	device_destroy(conn_class, MKDEV(major_number, MINOR_CONN));
+        class_destroy(conn_class);
 	device_remove_file(rule_dev, (const struct device_attribute*)&dev_attr_rules.attr);
 	device_remove_file(reset_dev, (const struct device_attribute*)&dev_attr_reset.attr);	
 	device_destroy(fw_class, MKDEV(major_number, MINOR_RULES));

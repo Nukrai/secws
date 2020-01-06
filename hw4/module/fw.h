@@ -41,7 +41,7 @@ typedef enum {
 #define LOOPBACK_NET_DEVICE_NAME	"lo"
 #define IN_NET_DEVICE_NAME			"eth1"
 #define OUT_NET_DEVICE_NAME			"eth2"
-
+#define CONN_NAME 			"conns"
 
 // auxiliary values, for your convenience
 #define IP_VERSION		(4)
@@ -54,6 +54,7 @@ typedef enum {
 	MINOR_RULES    = 0,
 	MINOR_LOG      = 1,
 	MINOR_RESET    = 2,
+	MINOR_CONN     = 3,
 } minor_t;
 
 typedef enum {
