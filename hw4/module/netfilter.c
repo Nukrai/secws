@@ -2,6 +2,7 @@
 #include "ruler.h"
 #include "logging.h"
 #include "conn.h"
+#include "netfilter.h"
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -16,6 +17,27 @@
 #include <net/tcp.h>
 
 
+
+unsigned int local_out_hook(unsigned int num, struct sk_buff *skb, const struct net_device *in, const struct net_device *out, int (*okfn)(struct sk_buff *)){
+	skb_linearize(skb);
+	struct tcphdr* tcp_header = NULL;
+	struct iphdr* ip_header = (struct iphdr*) skb_network_header(skb);
+	unsigned int src_ip = ip_header -> saddr;
+	unsigned int dst_ip = ip_header -> daddr;
+	if(!(ip_header -> protocol == PROT_TCP)){
+		return NF_ACCEPT;
+	}
+	tcp_header = (struct tcphdr *)((__u32 *)ip_header + ip_header->ihl);
+	int src_port = tcp_header -> source;
+	int dst_port = tcp_header -> dest;
+	int proxy_port = enforce_proxy(tcp_header, ip_header, skb, 0, src_port, dst_port, -1);	
+	if(proxy_port > 0){
+		update_proxy_port(dst_ip, dst_port, src_ip, src_port, proxy_port);
+	// reversed because the packet that tells us the proxy port is from the
+	// proxy port and when we want to override it, its when we need it as dest port.
+	}
+	return NF_ACCEPT;
+}
 unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct net_device *in, const struct net_device *out, int (*okfn)(struct sk_buff *)){
 	//get IP layer header
 	skb_linearize(skb);
@@ -30,11 +52,11 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	int src_port = PORT_ANY;
 	int dst_port = PORT_ANY;
 	int ack = ACK_ANY;
-	int syn;
+	int syn = 0;
 	direction_t direction;
 	log_piece* p;
 	unsigned char protocol = ip_header -> protocol;
-	if(compare_ip(src_ip, loopback, 8) || compare_ip(dst_ip, loopback, 8)){ //loopback packets
+	if(compare_ip(src_ip, LOOPBACK, 8) || compare_ip(dst_ip, LOOPBACK, 8)){ //loopback packets
 		return NF_ACCEPT;
 	}
 	if(ip_header-> protocol == PROT_UDP){ // UDP packet
@@ -98,6 +120,9 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		int fin = tcp_header -> fin;
 		int rst = tcp_header -> rst;
 		is_ftp20 = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, get_ftp20());
+		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);	
+		add_new_connection(dst_ip, dst_port, src_ip, src_port, SYN_RCVD);
+		return NF_ACCEPT;	
 	}
 	// search rule for the packet
 	if((syn == 1 && ack == 0 && is_ftp20 == 0) || protocol != PROT_TCP){
@@ -138,26 +163,51 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
                 int fin = tcp_header -> fin;
                 int rst = tcp_header -> rst;
                 unsigned int ret = tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
-		if(!tcp_header)
-			return ret;
+		enforce_proxy(tcp_header, ip_header, skb, 1, src_port, dst_port,
+			get_proxy_port(src_ip, src_port, dst_ip, dst_port));
+		return ret;
+	}	
+}
+
+int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_buff* skb, int is_pre, int src_port, int dst_port, int proxy_port){
+
+	if(!tcp_header)
+		return -1;
+	if(is_pre == 1){
 		if(tcp_header -> dest == htons(80) || tcp_header -> dest == htons(21)){
 			//changing of routing
-			ip_header->daddr = direction == DIRECTION_IN ? MY_IP_IN : MY_IP_OUT; //change to my ip
+			ip_header->daddr = MY_IP_IN;//change to my ip
 			tcp_header->dest = (tcp_header->dest == htons(80) ?
 			 HTTP_PROXY_PORT : FTP_PROXY_PORT); // to proxy port
 			//here start the fix of checksum for both IP and TCP
-			int tcplen = (skb->len - ((ip_header->ihl )<< 2));
+			int tcplen = (skb->len - ((ip_header->ihl) << 2));
 			tcp_header -> check = 0;
 			tcp_header -> check = tcp_v4_check(tcplen, ip_header->saddr, ip_header -> daddr, csum_partial((char*)tcp_header, tcplen, 0));
 			skb->ip_summed = CHECKSUM_NONE; //stop offloading
 			ip_header->check = 0;
 			ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-			return ret;
+			return -1;
 		}
 		if(tcp_header -> source == htons(80) || tcp_header -> source == htons(21)){
-                        //changing of routing
-                        ip_header->daddr = direction == DIRECTION_IN ? MY_IP_IN : MY_IP_OUT; //change to my ip
-                        tcp_header->dest = get_proxy_port(src_ip, src_port, dst_ip, dst_port); // to proxy port
+       		    //changing of routing
+			ip_header->daddr = MY_IP_OUT; //change to my ip
+			tcp_header->dest = proxy_port; // to proxy port
+			//here start the fix of checksum for both IP and TCP
+			int tcplen = (skb->len - ((ip_header->ihl) << 2));
+			tcp_header -> check = 0;
+	                tcp_header -> check = tcp_v4_check(tcplen, ip_header->saddr, ip_header -> daddr, csum_partial((char*)tcp_header, tcplen, 0));
+			skb->ip_summed = CHECKSUM_NONE; //stop offloading
+			ip_header->check = 0;
+			ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
+	                        return -1;
+		}
+	}
+	else{
+		if(tcp_header -> dest == htons(80) || tcp_header -> dest == htons(21)){
+	                    //changing of routing
+			int ret = tcp_header -> source; 
+                        ip_header->saddr = HOST1_IP; //change to client ip
+                        tcp_header->source = src_port; // to source port
                         //here start the fix of checksum for both IP and TCP
                         int tcplen = (skb->len - ((ip_header->ihl) << 2));
                         tcp_header -> check = 0;
@@ -165,13 +215,24 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
                         skb->ip_summed = CHECKSUM_NONE; //stop offloading
                         ip_header->check = 0;
                         ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-                        return ret;
+                                return ret;
+                }
+		if(tcp_header -> dest == dst_port){
+                            //changing of routing
+                        ip_header->saddr = HOST2_IP; //change to client ip
+                        tcp_header->source = src_port; // to source port
+                        //here start the fix of checksum for both IP and TCP
+                        int tcplen = (skb->len - ((ip_header->ihl) << 2));
+                        tcp_header -> check = 0;
+                        tcp_header -> check = tcp_v4_check(tcplen, ip_header->saddr, ip_header -> daddr, csum_partial((char*)tcp_header, tcplen, 0));
+                        skb->ip_summed = CHECKSUM_NONE; //stop offloading
+                        ip_header->check = 0;
+                        ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
+                                return -1;
                 }
 
-		else{
-			return ret;
-		}
-	}	
+	}
+	return -1;
 }
-
+	
 

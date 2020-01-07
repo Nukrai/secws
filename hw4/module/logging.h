@@ -1,4 +1,6 @@
 #include "fw.h"
+#ifndef LOGGING_H
+#define LOGGING_H
 
 #define DEFAULT_LOG_SIZE 10
 #define MAX_LINE 70
@@ -35,3 +37,5 @@ void register_reset_device(void);
 void add_log(log_piece* l);
 
 int search_log(log_piece* l);
+
+#endif /* LOGGING_H */

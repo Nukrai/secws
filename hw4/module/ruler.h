@@ -1,5 +1,8 @@
 #include "fw.h"
 
+#ifndef RULER_H
+#define RULER_H
+
 int search_rule(int direction, unsigned int src_ip, unsigned int dst_ip, int src_port, int dst_port, int protocol, int ack);
 
 rule_t* get(int idx);
@@ -11,3 +14,5 @@ ssize_t ruler_display(struct device *dev, struct device_attribute *attr, char *b
 ssize_t ruler_modify(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 
 rule_t* create_rule(int direction, unsigned int src_ip, unsigned int dst_ip, int src_port, int dst_port, int protocol, int ack, int action);
+
+#endif /* RULER_H */

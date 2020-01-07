@@ -1,3 +1,6 @@
+#ifndef CONN_H
+#define CONN_H
+
 #define FTP_PROXY_PORT 210
 #define HTTP_PROXY_PORT 800
 #define DEFAULT_SIZE 10
@@ -21,6 +24,7 @@ typedef struct {
 	int src_port;
 	unsigned int dst_ip;
 	int dst_port;
+	int proxy_port;
 	state_t state;
 } conn_t;
 
@@ -32,6 +36,10 @@ static int allocnt = 0;
 static conn_t ftp_connection;
 
 conn_t* get_ftp20(void);
+
+int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port);
+
+void update_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int proxy_port);
 
 unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst);
 
@@ -52,3 +60,5 @@ char* conn_str(void);
 void conn_setup(void);
 
 void conn_clear(void);
+
+#endif /* CONN_H */

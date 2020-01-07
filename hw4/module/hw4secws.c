@@ -2,6 +2,7 @@
 #include "ruler.h"
 #include "logging.h"
 #include "conn.h"
+#include "netfilter.h"
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -36,7 +37,6 @@ struct nf_hook_ops lo_ops;
 int major_number;
 int log_major_number;
 
-unsigned int loopback = 16777343;
 struct class* fw_class 	= NULL;
 struct class* log_class = NULL;
 
@@ -89,170 +89,20 @@ void clean(void){
 	return;
 }
 
-unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct net_device *in, const struct net_device *out, int (*okfn)(struct sk_buff *)){
-	//get IP layer header
-	skb_linearize(skb);
-	struct tcphdr* tcp_header =NULL;
-	struct iphdr *ip_header = (struct iphdr*)skb_network_header(skb);
-	if(ip_header == NULL){
-		printk("[firewall] error in parsing packer");
-		return NF_DROP;
-	}
-	unsigned int src_ip = ip_header -> saddr;
-	unsigned int dst_ip = ip_header -> daddr;
-	int src_port = PORT_ANY;
-	int dst_port = PORT_ANY;
-	int ack = ACK_ANY;
-	int syn;
-	direction_t direction;
-	log_piece* p;
-	unsigned char protocol = ip_header -> protocol;
-	if(compare_ip(src_ip, loopback, 8) || compare_ip(dst_ip, loopback, 8)){ //loopback packets
-		return NF_ACCEPT;
-	}
-	if(ip_header-> protocol == PROT_UDP){ // UDP packet
-		struct udphdr *udp_header = (struct udphdr*) skb_transport_header(skb);
-		if(udp_header == NULL){
-			printk("[firewall] error in parsing UDP");
-			return NF_DROP;
-		}
-		src_port = ntohs(udp_header -> source);
-                dst_port = ntohs(udp_header -> dest);
-
-	}
-	if(ip_header-> protocol == PROT_TCP){ //TCP packet
-		tcp_header= (struct tcphdr *)((__u32 *)ip_header+ ip_header->ihl);
-		if(tcp_header == NULL){
-			printk("[firewall] error in parsing TCP");
-		}
-                src_port = ntohs(tcp_header -> source);
-                dst_port = ntohs(tcp_header -> dest);
-		syn = tcp_header -> syn;
-		ack = tcp_header -> ack; //ntohl(tcp_header -> ack);
-		if((tcp_header -> psh) && (tcp_header -> urg) && (tcp_header -> fin)){ // XMAS packet
-			log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, PROT_TCP, 0, NF_DROP, REASON_XMAS_PACKET);
-			if(p == NULL){
-				printk("[firewall][null log piece]");
-			}
-			add_log(p);
-			return NF_DROP;
-		}
-	}
-	// find direction
-	if(in != NULL){ //&& out != NULL){ // for change to pre routing
-		if(!(strlen(in -> name) == 4)){// && strlen(out -> name) == 4)){
-			direction = -1;	
-		}
-		else{
-			direction = !strncmp(in -> name, "eth1", 4) ? DIRECTION_OUT : !strncmp(in -> name, "eth2", 4) ? DIRECTION_IN : -1;
-			 // changed by the move to pre routing
-		}
-	}
-	else{
-		// no direction - error. log and drop
-		log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, NF_DROP, REASON_ILLEGAL_VALUE);
-		if(p == NULL){
-			printk("[firewall] error in create_log-returned NULL");
-		}
-		add_log(p);
-		return NF_DROP;
-	}
-
-	if(direction == -1){
-		return NF_ACCEPT;
-	}
-	if(protocol != PROT_TCP && protocol != PROT_ICMP && protocol != PROT_UDP){ // other protocols, ignore
-		return NF_ACCEPT;
-	}
-
-	int is_ftp20 = 0;
-	if(syn == 1 && ack == 0 && protocol ==  PROT_TCP){
-		syn = tcp_header -> syn;
-		int fin = tcp_header -> fin;
-		int rst = tcp_header -> rst;
-		is_ftp20 = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, get_ftp20());
-	}
-	// search rule for the packet
-	if((syn == 1 && ack == 0 && is_ftp20 == 0) || protocol != PROT_TCP){
-		
-		printk("[firewall] rulestable \n");
-		int idx = search_rule(direction, src_ip,dst_ip,src_port,dst_port,protocol,ack);
-
-		if(idx >= 0){ // if rule found
-			rule_t* found = get(idx);
-			unsigned int ret = found->action; // NF_ACCEPT or NF_DROP
-			log_piece* p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, found -> action, idx);
-		
-			if(p == NULL){
-				printk("[firewall] error in create_log - returned NULL");
-				return ret;
-			}
-			// log
-			add_log(p);
-			printk("[firewall] static rule check\n");
-			if(ret == NF_ACCEPT){
-				add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
-				add_new_connection(dst_ip, dst_port, src_ip, src_port, SYN_RCVD);
-			}
-			return ret;
-		} 
-		//no rule found - DROP
-        	p = create_log(src_ip, dst_ip, src_port, dst_port, protocol, num, NF_DROP, REASON_NO_MATCHING_RULE);
-        	if(p == NULL){
-			printk("[firewall] error in create_log- returned NULL");
-		}
-		// log
-		add_log(p);
-		return NF_DROP;
-	}
-	else{ // (TCP, ack == 1 )=> check conn_table
-		printk("[firewall] conn table \n");
-		int syn = tcp_header -> syn;
-                int fin = tcp_header -> fin;
-                int rst = tcp_header -> rst;
-                unsigned int ret = tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
-		if(!tcp_header)
-			return ret;
-		if(tcp_header -> dest == htons(80) || tcp_header -> dest == htons(21)){
-			//changing of routing
-			ip_header->daddr = direction == DIRECTION_IN ? MY_IP_IN : MY_IP_OUT; //change to my ip
-			tcp_header->dest = (tcp_header->dest == htons(80) ?
-			 HTTP_PROXY_PORT : FTP_PROXY_PORT); // to proxy port
-			//here start the fix of checksum for both IP and TCP
-			int tcplen = (skb->len - ((ip_header->ihl )<< 2));
-			tcp_header -> check = 0;
-			tcp_header -> check = tcp_v4_check(tcplen, ip_header->saddr, ip_header -> daddr, csum_partial((char*)tcp_header, tcplen, 0));
-			skb->ip_summed = CHECKSUM_NONE; //stop offloading
-			ip_header->check = 0;
-			ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-			return ret;
-		}
-		if(tcp_header -> source == htons(80) || tcp_header -> source == htons(21)){
-                        //changing of routing
-                        ip_header->daddr = direction == DIRECTION_IN ? MY_IP_IN : MY_IP_OUT; //change to my ip
-                        tcp_header->dest = get_proxy_port(src_ip, src_port, dst_ip, dst_port); // to proxy port
-                        //here start the fix of checksum for both IP and TCP
-                        int tcplen = (skb->len - ((ip_header->ihl) << 2));
-                        tcp_header -> check = 0;
-                        tcp_header -> check = tcp_v4_check(tcplen, ip_header->saddr, ip_header -> daddr, csum_partial((char*)tcp_header, tcplen, 0));
-                        skb->ip_summed = CHECKSUM_NONE; //stop offloading
-                        ip_header->check = 0;
-                        ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-                        return ret;
-                }
-
-		else{
-			return ret;
-		}
-	}	
-}
-
 static __init int basic_fw_init(void){
-        //hook setup
+        //hooks setup
         fo_ops.hook = forward_hook;
-	fo_ops.hooknum = NF_INET_FORWARD;
+	lo_ops.hook = local_out_hook;
+	
+	fo_ops.hooknum = NF_INET_PRE_ROUTING;
+	lo_ops.hooknum = NF_INET_LOCAL_OUT;
+	
 	fo_ops.pf = PF_INET;
-        fo_ops.priority = NF_IP_PRI_FIRST;
+	lo_ops.pf = PF_INET;
+        
+	fo_ops.priority = NF_IP_PRI_FIRST;
+        lo_ops.priority = NF_IP_PRI_FIRST;
+	
 	// reset dev, rules dev, log dev and conn dev setup
 	if ((major_number = register_chrdev(0, CLASS_NAME, &fops)) < 0){
 		clean();
@@ -332,6 +182,7 @@ static __init int basic_fw_init(void){
 	//register the hook
 	conn_setup();
 	nf_register_hook(&fo_ops);
+	nf_register_hook(&lo_ops);
 	//init DS's
 	log_reset(NULL, NULL, NULL, 0);
 	printk("[Firewall] Registerd with majors %d and %d", major_number, log_major_number);
@@ -350,6 +201,7 @@ void basic_fw_exit(void){
 	}
 	clean();
 	nf_unregister_hook(&fo_ops);
+	nf_unregister_hook(&lo_ops);
 	return;
 }
 

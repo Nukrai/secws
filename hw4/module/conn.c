@@ -41,9 +41,6 @@ ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char
 	if(i < 4 && i >= 0){
 		return count;
 	}
-
-	add_new_connection(src_ip, src_port, dst_ip, dst_port, CLOSED);
-	add_new_connection(dst_ip, dst_port, src_ip, src_port, CLOSED);
 	ftp_connection.src_ip = src_ip;
 	ftp_connection.dst_ip = dst_ip;
 	ftp_connection.src_port = src_ip;
@@ -63,8 +60,31 @@ int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_
            src_ip == conn -> dst_ip && src_port == conn -> dst_port){
                 return 1;
         }
-	//TODO: add HTTP & FTP 	
+	//TODO: add FTP port = 20 logic
 	return 0;
+}
+
+int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port){
+	conn_t* conn = NULL;
+	for(int i = 0; i < conn_size; ++i){
+		conn = conn_list[i];
+		if(is_matching(src_ip, src_port, dst_ip, dst_port, 0, 0, 0, conn) == 1){
+			return conn -> proxy_port;
+		}
+	}
+	return -1;
+}
+
+void update_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int proxy_port){
+	conn_t* conn = NULL;
+        for(int i = 0; i < conn_size; ++i){
+                conn = conn_list[i];
+                if(is_matching(src_ip, src_port, dst_ip, dst_port, 0, 0, 0, conn) == 1){
+                        conn -> proxy_port = proxy_port;
+			return;
+                }
+        }
+        return;
 }
 
 unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst){
