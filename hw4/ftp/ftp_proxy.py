@@ -35,57 +35,50 @@ try:
 except:
 	print("Could not listen and/or bind")
 	sys.exit(-1)
+while(True):
 
-try:
-	while True:
+	try:
+		out_sock = socket.socket()
+	except:
+		print("Could not create out socket")
+		in_sock.close()
+		out_sock.close()	
+		sys.exit(-1)
+	try:	
 		conn, addr = in_sock.accept()
-		print(addr)
-		try:
-			out_sock = socket.socket()
-		except:
-			print("Could not create out socket")
-			in_sock.close()
-			out_sock.close()	
-			sys.exit(-1)
-		try:
-			out_sock.connect(("10.1.2.2", 21))
-		except:
-			out_sock.close()
-			in_sock.close()
-			sys.exit(-1)
-		print("connected to out")
-		exit = 0;
-		while(not exit):
-			read, _, _ = select.select([conn, out_sock], [], [conn, out_sock])
-			for c in read:
-				if(c == conn):
-					p = conn.recv(4096)
-					if(not(p)):
-						read.remove(conn)
-						conn.shutdown(socket.SHUT_RD)
-						exit = 1
-						continue
-					if(ftp_filter(p)):
-						out_sock.sendall(p)
-						read.remove(conn)
-				if(c == out_sock):
-					p = out_sock.recv(4096)
-					if(not(p)):
-						read.remove(out_sock)
-						out_sock.shutdown(socket.SHUT_RD)
-						exit = 1
-						continue
-					if(ftp_filter(p)):
-						conn.send(p)
-						read.remove(out_sock)
-except Exception as e:
-	print(str(e))
-	conn.close()
-	in_sock.close()
-	out_sock.close()
-
-
-
-
-
-
+	except:
+		break;
+	try:		
+		out_sock.connect(("10.1.2.2", 21))
+	except:
+		out_sock.close()
+		conn.close()
+		continue
+	print("connected to out")
+	exit = 0;
+	while(not exit):
+		read, _, _ = select.select([conn, out_sock], [], [conn, out_sock])
+		for c in read:
+			if(c == conn):
+				p = conn.recv(4096)
+				if(not(p)):
+					read.remove(conn)
+					conn.close()
+					out_sock.close()
+					exit = 1
+					break
+				if(ftp_filter(p)):
+					out_sock.sendall(p)
+					read.remove(conn)
+			if(c == out_sock):
+				p = out_sock.recv(4096)
+				if(not(p)):
+					read.remove(out_sock)
+					out_sock.close()
+					conn.close()
+					exit = 1
+					continue
+				if(http_filter(p)):
+					conn.send(p)
+in_sock.close()
+out_sock.close()
