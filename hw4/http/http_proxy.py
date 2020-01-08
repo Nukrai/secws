@@ -8,8 +8,6 @@ HEADER = "Content-Type"
 FORBIDDEN_TYPES = ["text/csv", "application/zip"]
 HTTP_PROXY_PORT = 800
 def http_filter(p):
-	#try:
-	print(str(p),"\n\n\n")
 	try:
 		request_line, headers_alone = p.split(b'\r\n', 1)
 		headers = BytesParser().parsebytes(headers_alone)
