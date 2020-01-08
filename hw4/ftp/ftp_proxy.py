@@ -14,16 +14,12 @@ FTP_PATH = "/sys/class/fw/ftp/ftp"
 def ftp_filter(p):
 	try:
 		p = str(p)
-		print(p)
 		if(COMMAND in p):
 			idx = p.index(COMMAND) + len(COMMAND)
 			p = p[idx:]
-			print(p)
 			p = p[:p.index("\\n")]
 			ip1, ip2, ip3, ip4, port1, port2 = p.split(",")
-			print(port1, port2)
 			os.system('echo "{0} {1} {2} {3}" > {4}'.format(HOST2_IP, socket.htons(20), HOST1_IP, socket.htons(16*16*int(port1)+int(port2)) , FTP_PATH))
-		print("ftp accepted!")
 	except:
 		pass
 	return True
