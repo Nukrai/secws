@@ -37,6 +37,8 @@ static conn_t ftp_connection;
 
 conn_t* get_ftp20(void);
 
+void last_ack_cleanup(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port);
+
 int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port);
 
 void update_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int proxy_port);

@@ -19,7 +19,7 @@
 
 
 unsigned int local_out_hook(unsigned int num, struct sk_buff *skb, const struct net_device *in, const struct net_device *out, int (*okfn)(struct sk_buff *)){
-	skb_linearize(skb);
+ 	skb_linearize(skb);
 	struct tcphdr* tcp_header = NULL;
 	struct iphdr* ip_header = (struct iphdr*) skb_network_header(skb);
 	unsigned int src_ip = ip_header -> saddr;
@@ -27,14 +27,32 @@ unsigned int local_out_hook(unsigned int num, struct sk_buff *skb, const struct 
 	if(!(ip_header -> protocol == PROT_TCP)){
 		return NF_ACCEPT;
 	}
-	tcp_header = (struct tcphdr *)((__u32 *)ip_header + ip_header->ihl);
-	int src_port = tcp_header -> source;
-	int dst_port = tcp_header -> dest;
-	int proxy_port = enforce_proxy(tcp_header, ip_header, skb, 0, src_port, dst_port, -1);	
+	printk("[[%d]]", ip_header -> protocol);
+	tcp_header = (struct tcphdr *)(skb -> data + ip_header->ihl * 4);
+	int src_port = htons(tcp_header -> source);
+	int dst_port = htons(tcp_header -> dest);
+	printk("[LO] tcp_header = %u %u %d %d ",src_ip,dst_ip, src_port, dst_port);
+	int proxy_port = enforce_proxy(tcp_header, ip_header, skb, 0, src_port, dst_port, 2);	
+        src_ip = ip_header -> saddr;
+        dst_ip = ip_header -> daddr;
+	src_port = htons(tcp_header -> source);
+	dst_port = htons(tcp_header -> dest);
+	int syn =  tcp_header -> syn;
+	int ack =  tcp_header -> ack;
+	int fin =  tcp_header -> fin;
+	int rst =  tcp_header -> rst;
+	printk("[prixy_port = %d]\n", proxy_port);
 	if(proxy_port > 0){
-		update_proxy_port(dst_ip, dst_port, src_ip, src_port, proxy_port);
+		update_proxy_port(dst_ip, dst_port, src_ip, 0, proxy_port);
 	// reversed because the packet that tells us the proxy port is from the
 	// proxy port and when we want to override it, its when we need it as dest port.
+	}
+	if(tcp_header -> rst){
+		tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
+	}
+	if(ack){
+		printk("[rf5gw]\n");
+		last_ack_cleanup(dst_ip, dst_port, src_ip, src_port);		
 	}
 	return NF_ACCEPT;
 }
@@ -71,6 +89,7 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	}
 	if(ip_header-> protocol == PROT_TCP){ //TCP packet
 		tcp_header= (struct tcphdr *)((__u32 *)ip_header+ ip_header->ihl);
+		printk("[prerout] %p %p %p %p\n",tcp_header, tcp_header+8, tcp_header+16,tcp_header +24);
 		if(tcp_header == NULL){
 			printk("[firewall] error in parsing TCP");
 		}
@@ -89,7 +108,8 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 	}
 	// find direction
 	if(in != NULL){ //&& out != NULL){ // for change to pre routing
-		if(!(strlen(in -> name) == 4)){// && strlen(out -> name) == 4)){
+		if( !(strlen(in -> name) == 4)){// && strlen(out -> name) == 4)){
+                        //c
 			direction = -1;	
 		}
 		else{
@@ -120,9 +140,12 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 		int fin = tcp_header -> fin;
 		int rst = tcp_header -> rst;
 		is_ftp20 = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, get_ftp20());
-		add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);	
-		add_new_connection(dst_ip, dst_port, src_ip, src_port, SYN_RCVD);
-		return NF_ACCEPT;	
+		if(is_ftp20){
+			printk("[FTP 20]\n");
+			add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);	
+			add_new_connection(dst_ip, dst_port, src_ip, src_port, SYN_RCVD);
+			return NF_ACCEPT;	
+		}
 	}
 	// search rule for the packet
 	if((syn == 1 && ack == 0 && is_ftp20 == 0) || protocol != PROT_TCP){
@@ -142,9 +165,12 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
 			// log
 			add_log(p);
 			printk("[firewall] static rule check\n");
-			if(ret == NF_ACCEPT){
+			if(ret == NF_ACCEPT && protocol == PROT_TCP){
 				add_new_connection(src_ip, src_port, dst_ip, dst_port, SYN_SENT);
 				add_new_connection(dst_ip, dst_port, src_ip, src_port, SYN_RCVD);
+				printk("[enforce proxy!!!]\n");
+				enforce_proxy(tcp_header, ip_header, skb, 1, src_port, dst_port,
+                                get_proxy_port(src_ip, src_port, dst_ip, dst_port));
 			}
 			return ret;
 		} 
@@ -163,8 +189,10 @@ unsigned int forward_hook(unsigned int num, struct sk_buff *skb, const struct ne
                 int fin = tcp_header -> fin;
                 int rst = tcp_header -> rst;
                 unsigned int ret = tcp_enforce(src_ip, src_port, dst_ip, dst_port, syn, ack, fin, rst);
-		enforce_proxy(tcp_header, ip_header, skb, 1, src_port, dst_port,
-			get_proxy_port(src_ip, src_port, dst_ip, dst_port));
+		if(ret == NF_ACCEPT){
+			enforce_proxy(tcp_header, ip_header, skb, 1, src_port, dst_port,
+				get_proxy_port(src_ip, src_port, dst_ip, dst_port));
+		}
 		return ret;
 	}	
 }
@@ -173,12 +201,14 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 
 	if(!tcp_header)
 		return -1;
+	printk("[src %d dst %d proxy %d]\n", src_port, dst_port, proxy_port);
 	if(is_pre == 1){
-		if(tcp_header -> dest == htons(80) || tcp_header -> dest == htons(21)){
+		if(dst_port == (80) || dst_port == (21)){
 			//changing of routing
+			printk("[PRE, dest = 80/21]\n");
 			ip_header->daddr = MY_IP_IN;//change to my ip
-			tcp_header->dest = (tcp_header->dest == htons(80) ?
-			 HTTP_PROXY_PORT : FTP_PROXY_PORT); // to proxy port
+			tcp_header->dest = ntohs((tcp_header->dest == htons(80) ?
+			 HTTP_PROXY_PORT : FTP_PROXY_PORT)); // to proxy port
 			//here start the fix of checksum for both IP and TCP
 			int tcplen = (skb->len - ((ip_header->ihl) << 2));
 			tcp_header -> check = 0;
@@ -188,10 +218,12 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 			ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
 			return -1;
 		}
-		if(tcp_header -> source == htons(80) || tcp_header -> source == htons(21)){
+		if(src_port == (80) || src_port  == (21)){
        		    //changing of routing
+
+			printk("[PRE, source = 80/21]\n");
 			ip_header->daddr = MY_IP_OUT; //change to my ip
-			tcp_header->dest = proxy_port; // to proxy port
+			//tcp_header->dest = ntohs(proxy_port); // to proxy port
 			//here start the fix of checksum for both IP and TCP
 			int tcplen = (skb->len - ((ip_header->ihl) << 2));
 			tcp_header -> check = 0;
@@ -199,15 +231,16 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 			skb->ip_summed = CHECKSUM_NONE; //stop offloading
 			ip_header->check = 0;
 			ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-	                        return -1;
+	                return -1;
 		}
 	}
 	else{
-		if(tcp_header -> dest == htons(80) || tcp_header -> dest == htons(21)){
+		if(dst_port == (80) || dst_port == (21)){
 	                    //changing of routing
-			int ret = tcp_header -> source; 
+			printk("[LOCAL_OUT, dest = 80/21]\n");
+			int ret = ntohs(tcp_header -> source); 
                         ip_header->saddr = HOST1_IP; //change to client ip
-                        tcp_header->source = src_port; // to source port
+                        //tcp_header->source = ntohs(src_port); // to source port
                         //here start the fix of checksum for both IP and TCP
                         int tcplen = (skb->len - ((ip_header->ihl) << 2));
                         tcp_header -> check = 0;
@@ -215,12 +248,14 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
                         skb->ip_summed = CHECKSUM_NONE; //stop offloading
                         ip_header->check = 0;
                         ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-                                return ret;
+                        printk("[src_port=%d, proxyport = %d\n", src_port, ret);
+			return src_port;
                 }
-		if(tcp_header -> dest == dst_port){
+		if(src_port == HTTP_PROXY_PORT || src_port == FTP_PROXY_PORT){
                             //changing of routing
+			printk("[LOCAL_OUT, dest = dest port of conn]\n");
                         ip_header->saddr = HOST2_IP; //change to client ip
-                        tcp_header->source = src_port; // to source port
+			tcp_header->source = ntohs((src_port == HTTP_PROXY_PORT ? 80 : 21)); // to source port
                         //here start the fix of checksum for both IP and TCP
                         int tcplen = (skb->len - ((ip_header->ihl) << 2));
                         tcp_header -> check = 0;
@@ -228,7 +263,7 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
                         skb->ip_summed = CHECKSUM_NONE; //stop offloading
                         ip_header->check = 0;
                         ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
-                                return -1;
+                        return -1;
                 }
 
 	}

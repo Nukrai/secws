@@ -2,29 +2,11 @@
 import socket
 import select
 import sys
-from email.parser import BytesParser
 
-HEADER = "Content-Type"
-FORBIDDEN_TYPES = ["text/csv", "application/zip"]
+
 HTTP_PROXY_PORT = 800
-def http_filter(p):
-	#try:
-	request_line, headers_alone = p.split(b'\r\n', 1)
-	headers = BytesParser().parsebytes(headers_alone)
-	#except:
-	#	print("could not parse http")
-	#	return True
-
-	if(HEADER in headers):
-		for t in FORBIDDEN_TYPES:
-			if(t in headers[HEADER]):
-				return False
+def is_valid():
 	return True
-
-
-
-
-
 try:
 	in_sock = socket.socket()
 	in_sock.bind(("", HTTP_PROXY_PORT))
@@ -61,9 +43,8 @@ while True:
 					conn.shutdown(socket.SHUT_RD)
 					exit = 1
 					continue
-				if(http_filter(p)):
-					out_sock.sendall(p)
-					read.remove(conn)
+				out_sock.sendall(p)
+				read.remove(conn)
 			if(c == out_sock):
 				p = out_sock.recv(4096)
 				if(not(p)):
@@ -71,12 +52,11 @@ while True:
 					out_sock.shutdown(socket.SHUT_RD)
 					exit = 1
 					continue
-				if(http_filter(p)):
-					conn.send(p)
-					read.remove(out_sock)
-conn.close()
-in_sock.close()
-out_sock.close()
+				conn.send(p)
+				read.remove(out_sock)
+	conn.close()
+	in_sock.close()
+	out_sock.close()
 
 
 

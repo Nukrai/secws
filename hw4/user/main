@@ -58,6 +58,7 @@ def ip2int(addr):
 def int2ip(addr):
 	return ".".join(socket.inet_ntoa(struct.pack("!I", addr)).split(".")[::-1])
 def conn_unparse(conns):
+	if(conns == ""):return ""
 	lines = conns.split("\n")
 	ret = ""
 	for line in lines:

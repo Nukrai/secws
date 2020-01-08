@@ -48,20 +48,58 @@ ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char
 	return count;
 }
 
+int proxy_match(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, conn_t* conn){
+	if(src_ip == conn -> src_ip && src_port == conn -> src_port && dst_ip == conn -> dst_ip){
+		return 1;
+	}
+	if(src_ip == conn -> dst_ip && src_port == conn -> dst_port && dst_ip == conn -> src_ip){
+		return 1;
+	}
+	return 0;
+}
+
+void last_ack_cleanup(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port){
+	conn_t* conn = NULL;
+	for(int i = 0; i < conn_size; ++i){
+                printk("[chwecking convdtrvvrfvrdrn %d]\n", i);
+		conn = conn_list[i];
+                
+        	printk("[sip %x dstip %x conn :  src_ip%x dst_ip %x-\n-src_port %d dst_port %d,conn src port %d, conn dst port %d proxy_port %d]\n",src_ip,dst_ip,conn -> src_ip, conn -> dst_ip, src_port, dst_port,conn -> src_port, conn -> dst_port, conn -> proxy_port);
+		if(conn -> state == LAST_ACK && proxy_match(src_ip, src_port, dst_ip, dst_port, conn)){
+			remove_connection(conn);
+			i--;
+			continue;
+                }
+        }
+	printk("DONE\n");
+	return;
+}
 
 int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int fin, int rst, conn_t* conn){
 	if(src_ip == conn -> src_ip && src_port == conn -> src_port &&
-	   dst_ip == conn -> dst_ip && dst_port == conn -> dst_port &&
+	   dst_ip == conn -> dst_ip && (dst_port == conn -> dst_port || dst_port == conn -> proxy_port) &&
 	   (rst || fin || (conn -> state == CLOSED && syn) )){
 		return 2;
 	}
 	//listen  to rst's in opposite direction 
-	if(dst_ip == conn -> src_ip && dst_port == conn -> src_port &&
-           src_ip == conn -> dst_ip && src_port == conn -> dst_port){
+	printk("[src_port %d dst_port %d,conn src port %d, conn dst port %d proxy_port %d]\n", src_port, dst_port,conn -> src_port, conn -> dst_port, conn -> proxy_port);
+	if(dst_ip == conn -> src_ip && (dst_port == conn -> src_port || dst_port == conn -> proxy_port) &&
+           src_ip == conn -> dst_ip && (src_port == conn -> dst_port )){
                 return 1;
         }
 	//TODO: add FTP port = 20 logic
 	return 0;
+}
+
+int get_src_port(unsigned int src_ip, unsigned int dst_ip, unsigned int dst_port){
+	conn_t* conn = NULL;
+        for(int i = 0; i < conn_size; ++i){
+		conn = conn_list[i];
+		if(conn -> src_ip == src_ip && conn -> dst_ip == dst_ip && conn -> dst_port == dst_port){
+			return conn -> src_port;
+		}
+	}
+	return -1;
 }
 
 int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port){
@@ -76,14 +114,20 @@ int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int d
 }
 
 void update_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int proxy_port){
+	printk("[UDDATING PROXY]\n\n");
 	conn_t* conn = NULL;
         for(int i = 0; i < conn_size; ++i){
-                conn = conn_list[i];
-                if(is_matching(src_ip, src_port, dst_ip, dst_port, 0, 0, 0, conn) == 1){
-                        conn -> proxy_port = proxy_port;
-			return;
+                printk("[chwecking conn %d]\n", i);
+		conn = conn_list[i];
+                if(proxy_match(src_ip, src_port, dst_ip, dst_port, conn)){
+                        printk("[proxy updated]\n");
+			conn -> proxy_port = proxy_port;
+			continue;
                 }
+        	printk("[sip %x dstip %x conn :  src_ip%x dst_ip %x-\n-src_port %d dst_port %d,conn src port %d, conn dst port %d proxy_port %d]\n",src_ip,dst_ip,conn -> src_ip, conn -> dst_ip, src_port, dst_port,conn -> src_port, conn -> dst_port, conn -> proxy_port);
+
         }
+	printk("DONE\n");
         return;
 }
 
@@ -115,6 +159,9 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 					if(syn && ack && !fin){
 						conn -> state = ESTABLISHED;
 						printk("[firewall] conn *changed* to EST\n");
+						ret = NF_ACCEPT;
+					}
+					if(ack){
 						ret = NF_ACCEPT;
 					}
 					continue;
