@@ -43,8 +43,8 @@ ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char
 	}
 	ftp_connection.src_ip = src_ip;
 	ftp_connection.dst_ip = dst_ip;
-	ftp_connection.src_port = src_ip;
-	ftp_connection.dst_port = dst_port;
+	ftp_connection.src_port = ntohs(src_port);
+	ftp_connection.dst_port = ntohs(dst_port);
 	return count;
 }
 
