@@ -340,6 +340,7 @@ int remove_connection(conn_t* conn){
 		}
 		conn_arr_size /= 2;
 		kfree(old_conn_list);
+		conn_dec();
 	}
 	return 0;		
 }
