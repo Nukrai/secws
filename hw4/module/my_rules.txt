@@ -1,4 +1,0 @@
-loopback any 127.0.0.1/8 127.0.0.1/8 any any any any accept
-rule1 in any any TCP >1023 23 any drop
-idontlikeudp any any any UDP any any any drop
-default any any any any any any any accept

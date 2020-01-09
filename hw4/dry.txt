@@ -1,9 +1,37 @@
 
 Module:
 	split into 3 code files and 3 headers
-	hw3secws.c -
-		main file. containes the hook func, registration code for the module.
-		hook func first checks the packet protocol and fills the details accordingly (and if it's TCP, makes sure the packet is not XMAS). then is searches for a rule and returns its action if found. if not - drops. then it logs its action using the log utils
+	hw4secws.c -
+		main file. containes the setup, registration code for the module and drivers.
+		- not very interesting
+	netfilter.c -
+		file for hook functions (pre routing/local out)
+
+		pre routing hook func first checks the packet protocol and fills the details accordingly (and if it's TCP, makes sure the packet is not XMAS).
+		Then is searches for a rule (if ack == 0) or connection (if ack == 1) and returns its action accordingly. 
+		If not - drops. then it logs its action (if it searched in the rule table)) using the log utils. if needed - it calls enforce_proxy to do proxy changes.
+		
+		local out hook - mainly checking for specific cases like extracting the proxy port, handing RST, last acks ... also does call enforce_proxy for proxy stuff
+		
+		enforce proxy - changes fields in packet to be MITM
+
+	conn.c - 
+		file for connection table related operations.
+		
+		ftp read/modify - handles port 20 speacial case to allow connection
+			
+		proxy match/is matching - checks conn to a packet with more and less sensativity to the proxy port 
+
+		get/update proxy port - quite self explainatory
+
+		tcp_enfore - enforces TCP state table (!)
+
+		conn_str - generates the connection string to be printed
+		
+		conn_display - 'prints' conn str output to the file
+
+		remove/add new connetion - self explainatory. i use dynamic array (Thanks for the course in data structures mavnat).
+
 	ruler.c -
 		file for rule-table oriented operations / rule table utils.
 		main functions: 

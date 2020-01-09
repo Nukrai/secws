@@ -1,5 +1,0 @@
-cd Desktop/hw3/module;
-make clean; make;
-sudo insmod firewall.ko;
-cat file > /sys/class/fw/rules/rules;
-make clean;

@@ -1,6 +1,6 @@
 #include "fw.h"
 #include "conn.h"
-
+// memory managing
 void conn_inc(void){
 	allocnt++;
 }
@@ -38,9 +38,10 @@ ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char
 
 	strncpy(str, buf, count);
 	i = sscanf(str, "%u %d %u %d", &src_ip, &src_port, &dst_ip, &dst_port);
-	if(i < 4 && i >= 0){
+	if(i < 4 && i >= 0){ //error
 		return count;
 	}
+	//set ftp connection properties
 	ftp_connection.src_ip = src_ip;
 	ftp_connection.dst_ip = dst_ip;
 	ftp_connection.src_port = ntohs(src_port);
@@ -51,13 +52,14 @@ ssize_t ftp_modify(struct device *dev, struct device_attribute *attr, const char
 int proxy_match(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, conn_t* conn){
 	if(src_ip == conn -> src_ip && src_port == conn -> src_port && dst_ip == conn -> dst_ip){
 		return 1;
-	}
+	} //regular form
 	if(src_ip == conn -> dst_ip && src_port == conn -> dst_port && dst_ip == conn -> src_ip){
 		return 1;
-	}
+	}//reverse form
 	return 0;
 }
 
+//ack that close a connection does not pass through conn tabke when using proxy so we need to take care of them manually
 void last_ack_cleanup(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port){
 	conn_t* conn = NULL;
 	for(int i = 0; i < conn_size; ++i){
@@ -72,18 +74,18 @@ void last_ack_cleanup(unsigned int src_ip, int src_port, unsigned int dst_ip, in
 	return;
 }
 
+// does a packet match a connection
 int is_matching(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int fin, int rst, conn_t* conn){
 	if(src_ip == conn -> src_ip && src_port == conn -> src_port &&
 	   dst_ip == conn -> dst_ip && (dst_port == conn -> dst_port || dst_port == conn -> proxy_port) &&
 	   (rst || fin || (conn -> state == CLOSED && syn) )){
 		return 2;
-	}
+	}// made by sender side - only relevant in specific cases (fin, rst, ETC)
 	//listen  to rst's in opposite direction 
 	if(dst_ip == conn -> src_ip && (dst_port == conn -> src_port || dst_port == conn -> proxy_port) &&
            src_ip == conn -> dst_ip && (src_port == conn -> dst_port )){
                 return 1;
-        }
-	//TODO: add FTP port = 20 logic
+        }// proxy might have dst port that dont match
 	return 0;
 }
 
@@ -97,7 +99,7 @@ int get_src_port(unsigned int src_ip, unsigned int dst_ip, unsigned int dst_port
 	}
 	return -1;
 }
-
+//get proxy port on connection
 int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port){
 	conn_t* conn = NULL;
 	for(int i = 0; i < conn_size; ++i){
@@ -109,6 +111,7 @@ int get_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int d
 	return -1;
 }
 
+// update PP of a connection
 void update_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int proxy_port){
 	conn_t* conn = NULL;
         for(int i = 0; i < conn_size; ++i){
@@ -123,14 +126,15 @@ void update_proxy_port(unsigned int src_ip, int src_port, unsigned int dst_ip, i
         return;
 }
 
+// enforce tcp FSM on a connection
 unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, int syn, int ack, int fin, int rst){
 	conn_t* conn;
 	int match;
-	unsigned int ret = NF_DROP;
+	unsigned int ret = NF_DROP; // default
 	for(int i = 0 ; i < conn_size; ++i){
 		conn = conn_list[i];
 		if((match = is_matching(src_ip, src_port, dst_ip, dst_port, syn, fin, rst, conn)) != 0){
-			if(rst){
+			if(rst){ // connection reset
 				remove_connection(conn);
 				i--;
 				ret =  NF_ACCEPT;
@@ -138,29 +142,29 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 			}
 			switch(conn -> state){
 				case CLOSED:
-					if(syn && !ack && !fin){
+					if(syn && !ack && !fin){ // CLOSED can be opend
 						conn -> state = (match == 1 ? SYN_RCVD : SYN_SENT);
 						ret = NF_ACCEPT;
 					}
 					continue;
 
-				case SYN_SENT:
-					if(syn && ack && !fin){
+				case SYN_SENT: 
+					if(syn && ack && !fin){ //syn ack means established
 						conn -> state = ESTABLISHED;
 						ret = NF_ACCEPT;
 					}
-					if(ack){
+					if(ack){ // just ack is possible
 						ret = NF_ACCEPT;
 					}
 					continue;
 
 				case SYN_RCVD:
-					if(ack && !syn && !fin){
+					if(ack && !syn && !fin){ // ack means established
 						conn -> state = ESTABLISHED;
 						ret = NF_ACCEPT;
 						continue;
 					}
-					if(fin && match == 2){
+					if(fin && match == 2){ //fin means closing before establishing - rare
 						conn -> state = FIN_WAIT_1;
 					}
 					continue;
@@ -168,7 +172,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 				case ESTABLISHED:
 					if(syn)
 						continue;
-					if(fin){
+					if(fin){ // someone wants to close
 						conn -> state = (match == 1 ? CLOSE_WAIT : FIN_WAIT_1);			
 						ret = NF_ACCEPT;
 						continue;
@@ -176,7 +180,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 					ret = NF_ACCEPT;
 					continue;
 
-				case FIN_WAIT_1:
+				case FIN_WAIT_1: // the sender of the fin 
 					if(syn)
 						continue;
 
@@ -224,7 +228,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 					}
 					continue;
 
-				case CLOSE_WAIT:
+				case CLOSE_WAIT: // main state for reciver of the first fin
 					if(syn)
 						continue;
 					if(match == 1){
@@ -244,7 +248,7 @@ unsigned int tcp_enforce(unsigned int src_ip, int src_port, unsigned int dst_ip,
 						ret = NF_ACCEPT;
 					}
 					continue;
-				case LAST_ACK:
+				case LAST_ACK: // almost closed
 					if(syn)
 						continue;
 					if(ack && match == 1){
@@ -277,7 +281,8 @@ char* conn_str(){
 	for(int i = 0; i < conn_size; i++){
 		if(i > 0)
 			str = strcat(str, "\n");
-		conn = conn_list[i];
+		conn = conn_list[i]; 
+		//pront conection details
 		sprintf(line, "%u %d %u %d %hhu", conn -> src_ip, conn -> src_port, conn -> dst_ip, conn -> dst_port, conn -> state);
 		str = strcat(str, line);
 	}
@@ -304,7 +309,7 @@ void conn_setup(void){
 }
 
 void conn_clear(void){
-	for(int i = 0; i < conn_size; i++){
+	for(int i = 0; i < conn_size; i++){ // free all conns
 		kfree(conn_list[i]);
 		conn_dec();
 	}
@@ -314,6 +319,7 @@ void conn_clear(void){
 	return;
 }
 
+// called when connection gets closed
 int remove_connection(conn_t* conn){
 	int idx = 0;
 	int i = 0;
@@ -321,7 +327,7 @@ int remove_connection(conn_t* conn){
 		if(conn_list[i] == conn){
 			kfree(conn);
 			conn_dec();
-			idx --;
+			idx --; // important to we will not jump over the next conn
 		}
 		else{
 			conn_list[idx] = conn_list[i];
@@ -331,7 +337,7 @@ int remove_connection(conn_t* conn){
 		return 1;
 
 	conn_size --;
-	if(conn_size == conn_arr_size/4 && conn_size > 10){
+	if(conn_size == conn_arr_size/4 && conn_size > 10){ // synamic resizing of the array
 		conn_t** old_conn_list = conn_list;
 		conn_list = kcalloc(conn_arr_size/2, sizeof(conn_t*), GFP_ATOMIC);
 		conn_inc();
@@ -345,6 +351,7 @@ int remove_connection(conn_t* conn){
 	return 0;		
 }
 
+//add new connection to the conn table
 int add_new_connection(unsigned int src_ip, int src_port, unsigned int dst_ip, int dst_port, state_t state){
 	conn_t* conn = kcalloc(1, sizeof(conn_t), GFP_ATOMIC);
 	conn_inc();
