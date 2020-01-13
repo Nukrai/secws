@@ -1,5 +1,5 @@
 obj-m += firewall.o
-firewall-objs += hw4secws.o ruler.o logging.o conn.o netfilter.o
+firewall-objs += hw5secws.o ruler.o logging.o conn.o netfilter.o
 ccflags-y := -std=gnu99 -Wno-declaration-after-statement -Wno-unused-variable 
 
 all:

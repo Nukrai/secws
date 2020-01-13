@@ -77,7 +77,7 @@ while(True):
 					conn.close()
 					exit = 1
 					continue
-				if(http_filter(p)):
+				if(ftp_filter(p)):
 					conn.send(p)
 in_sock.close()
 out_sock.close()

@@ -7,8 +7,8 @@
 #define HTTP_PROXY_PORT (800)
 #define HTTP_PORT (80)
 
-#define STMP_PROXY_PORT (250)
-#define STMP_PORT (25)
+#define SMTP_PROXY_PORT (250)
+#define SMTP_PORT (25)
 
 #define DEFAULT_SIZE (10)
 #define MAX_ROW_SIZE (70)

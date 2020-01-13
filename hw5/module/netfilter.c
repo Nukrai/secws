@@ -194,7 +194,7 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 	if(!tcp_header)
 		return -1;
 	if(is_pre == 1){
-		if(dst_port == HTTP_PORT || dst_port == FTP_PORT || dst_port == STMP_PORT){ // I hijack packet to server to my proxy
+		if(dst_port == HTTP_PORT || dst_port == FTP_PORT || dst_port == SMTP_PORT){ // I hijack packet to server to my proxy
 			//changing of routing
 			ip_header->daddr = MY_IP_IN;//change to my ip
 			int new_dest = 0;
@@ -204,8 +204,8 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 			if(tcp_header->dest  == htons(FTP_PORT))
 				new_dest = FTP_PROXY_PORT;
 			
-			if(tcp_header->dest  == htons(STMP_PORT))
-				new_dest = STMP_PROXY_PORT;
+			if(tcp_header->dest  == htons(SMTP_PORT))
+				new_dest = SMTP_PROXY_PORT;
 			
 			tcp_header->dest = ntohs(new_dest); // to proxy port
 			//here start the fix of checksum for both IP and TCP
@@ -217,7 +217,7 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 			ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
 			return -1;
 		}
-		if(src_port == HTTP_PORT || src_port  == FTP_PORT || src_port == STMP_PORT){ // I take response that should go to host1 to my proxy
+		if(src_port == HTTP_PORT || src_port  == FTP_PORT || src_port == SMTP_PORT){ // I take response that should go to host1 to my proxy
        		    //changing of routing
 
 			ip_header->daddr = MY_IP_OUT; //change to my ip
@@ -232,7 +232,7 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 		}
 	}
 	else{
-		if(dst_port == HTTP_PORT || dst_port == FTP_PORT || dst_port == STMP_PORT){// i send to server- need to look like client
+		if(dst_port == HTTP_PORT || dst_port == FTP_PORT || dst_port == SMTP_PORT){// i send to server- need to look like client
 	                    //changing of routing
 			int ret = ntohs(tcp_header -> source); 
                         ip_header->saddr = HOST1_IP; //change to client ip
@@ -245,7 +245,7 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
                         ip_header->check = ip_fast_csum((u8 *)ip_header, ip_header->ihl);
 			return src_port;
                 }
-		if(src_port == HTTP_PROXY_PORT || src_port == FTP_PROXY_PORT || src_port == STMP_PROXY_PORT){ /// i send to client - need to look like server
+		if(src_port == HTTP_PROXY_PORT || src_port == FTP_PROXY_PORT || src_port == SMTP_PROXY_PORT){ /// i send to client - need to look like server
                             //changing of routing
                         ip_header->saddr = HOST2_IP; //change to client ip
 			int new_source = 0;
@@ -255,8 +255,8 @@ int enforce_proxy(struct tcphdr* tcp_header, struct iphdr* ip_header, struct sk_
 			if(src_port == FTP_PROXY_PORT)
 				new_source = FTP_PORT;
 			
-			if(src_port == STMP_PROXY_PORT)
-				new_source = STMP_PORT;
+			if(src_port == SMTP_PROXY_PORT)
+				new_source = SMTP_PORT;
 			
 			tcp_header->source = ntohs(new_source); // to source port
                         //here start the fix of checksum for both IP and TCP
