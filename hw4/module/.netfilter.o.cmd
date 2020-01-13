@@ -1,9 +1,9 @@
-cmd_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o := gcc -Wp,-MD,/home/fw/new_nuki/secws-master/hw5/module/.hw4secws.o.d  -nostdinc -isystem /usr/lib/gcc/i686-linux-gnu/4.6/include  -I/usr/src/linux-headers-3.2.0-37-generic-pae/arch/x86/include -Iarch/x86/include/generated -Iinclude  -include /usr/src/linux-headers-3.2.0-37-generic-pae/include/linux/kconfig.h -Iubuntu/include  -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -m32 -msoft-float -mregparm=3 -freg-struct-return -mpreferred-stack-boundary=2 -march=i686 -mtune=generic -maccumulate-outgoing-args -Wa,-mtune=generic32 -ffreestanding -fstack-protector -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -DCONFIG_AS_CFI_SECTIONS=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=1024 -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -pg -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -std=gnu99 -Wno-declaration-after-statement -Wno-unused-variable  -DMODULE  -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(hw4secws)"  -D"KBUILD_MODNAME=KBUILD_STR(firewall)" -c -o /home/fw/new_nuki/secws-master/hw5/module/.tmp_hw4secws.o /home/fw/new_nuki/secws-master/hw5/module/hw4secws.c
+cmd_/home/fw/new_nuki/secws-master/hw4/module/netfilter.o := gcc -Wp,-MD,/home/fw/new_nuki/secws-master/hw4/module/.netfilter.o.d  -nostdinc -isystem /usr/lib/gcc/i686-linux-gnu/4.6/include  -I/usr/src/linux-headers-3.2.0-37-generic-pae/arch/x86/include -Iarch/x86/include/generated -Iinclude  -include /usr/src/linux-headers-3.2.0-37-generic-pae/include/linux/kconfig.h -Iubuntu/include  -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -m32 -msoft-float -mregparm=3 -freg-struct-return -mpreferred-stack-boundary=2 -march=i686 -mtune=generic -maccumulate-outgoing-args -Wa,-mtune=generic32 -ffreestanding -fstack-protector -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -DCONFIG_AS_CFI_SECTIONS=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=1024 -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -pg -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -std=gnu99 -Wno-declaration-after-statement -Wno-unused-variable  -DMODULE  -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(netfilter)"  -D"KBUILD_MODNAME=KBUILD_STR(firewall)" -c -o /home/fw/new_nuki/secws-master/hw4/module/.tmp_netfilter.o /home/fw/new_nuki/secws-master/hw4/module/netfilter.c
 
-source_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o := /home/fw/new_nuki/secws-master/hw5/module/hw4secws.c
+source_/home/fw/new_nuki/secws-master/hw4/module/netfilter.o := /home/fw/new_nuki/secws-master/hw4/module/netfilter.c
 
-deps_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o := \
-  /home/fw/new_nuki/secws-master/hw5/module/fw.h \
+deps_/home/fw/new_nuki/secws-master/hw4/module/netfilter.o := \
+  /home/fw/new_nuki/secws-master/hw4/module/fw.h \
   include/linux/module.h \
     $(wildcard include/config/sysfs.h) \
     $(wildcard include/config/modules.h) \
@@ -883,10 +883,10 @@ deps_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o := \
   include/net/tcp_states.h \
   include/net/timewait_sock.h \
   include/linux/udp.h \
-  /home/fw/new_nuki/secws-master/hw5/module/ruler.h \
-  /home/fw/new_nuki/secws-master/hw5/module/logging.h \
-  /home/fw/new_nuki/secws-master/hw5/module/conn.h \
-  /home/fw/new_nuki/secws-master/hw5/module/netfilter.h \
+  /home/fw/new_nuki/secws-master/hw4/module/ruler.h \
+  /home/fw/new_nuki/secws-master/hw4/module/logging.h \
+  /home/fw/new_nuki/secws-master/hw4/module/conn.h \
+  /home/fw/new_nuki/secws-master/hw4/module/netfilter.h \
   include/net/tcp.h \
     $(wildcard include/config/syn/cookies.h) \
   include/linux/crypto.h \
@@ -916,6 +916,6 @@ deps_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o := \
   include/net/inet_ecn.h \
   include/net/dsfield.h \
 
-/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o: $(deps_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o)
+/home/fw/new_nuki/secws-master/hw4/module/netfilter.o: $(deps_/home/fw/new_nuki/secws-master/hw4/module/netfilter.o)
 
-$(deps_/home/fw/new_nuki/secws-master/hw5/module/hw4secws.o):
+$(deps_/home/fw/new_nuki/secws-master/hw4/module/netfilter.o):

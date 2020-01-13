@@ -1,8 +1,8 @@
-cmd_/home/fw/Desktop/hw5/module/firewall.mod.o := gcc -Wp,-MD,/home/fw/Desktop/hw5/module/.firewall.mod.o.d  -nostdinc -isystem /usr/lib/gcc/i686-linux-gnu/4.6/include  -I/usr/src/linux-headers-3.2.0-37-generic-pae/arch/x86/include -Iarch/x86/include/generated -Iinclude  -include /usr/src/linux-headers-3.2.0-37-generic-pae/include/linux/kconfig.h -Iubuntu/include  -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -m32 -msoft-float -mregparm=3 -freg-struct-return -mpreferred-stack-boundary=2 -march=i686 -mtune=generic -maccumulate-outgoing-args -Wa,-mtune=generic32 -ffreestanding -fstack-protector -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -DCONFIG_AS_CFI_SECTIONS=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=1024 -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -pg -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -std=gnu99 -Wno-declaration-after-statement -Wno-unused-variable  -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(firewall.mod)"  -D"KBUILD_MODNAME=KBUILD_STR(firewall)" -DMODULE  -c -o /home/fw/Desktop/hw5/module/firewall.mod.o /home/fw/Desktop/hw5/module/firewall.mod.c
+cmd_/home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o := gcc -Wp,-MD,/home/fw/new_nuki/secws-master/hw5/module/.firewall.mod.o.d  -nostdinc -isystem /usr/lib/gcc/i686-linux-gnu/4.6/include  -I/usr/src/linux-headers-3.2.0-37-generic-pae/arch/x86/include -Iarch/x86/include/generated -Iinclude  -include /usr/src/linux-headers-3.2.0-37-generic-pae/include/linux/kconfig.h -Iubuntu/include  -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -O2 -m32 -msoft-float -mregparm=3 -freg-struct-return -mpreferred-stack-boundary=2 -march=i686 -mtune=generic -maccumulate-outgoing-args -Wa,-mtune=generic32 -ffreestanding -fstack-protector -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -DCONFIG_AS_CFI_SECTIONS=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=1024 -Wno-unused-but-set-variable -fno-omit-frame-pointer -fno-optimize-sibling-calls -pg -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -std=gnu99 -Wno-declaration-after-statement -Wno-unused-variable  -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(firewall.mod)"  -D"KBUILD_MODNAME=KBUILD_STR(firewall)" -DMODULE  -c -o /home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o /home/fw/new_nuki/secws-master/hw5/module/firewall.mod.c
 
-source_/home/fw/Desktop/hw5/module/firewall.mod.o := /home/fw/Desktop/hw5/module/firewall.mod.c
+source_/home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o := /home/fw/new_nuki/secws-master/hw5/module/firewall.mod.c
 
-deps_/home/fw/Desktop/hw5/module/firewall.mod.o := \
+deps_/home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o := \
     $(wildcard include/config/module/unload.h) \
   include/linux/module.h \
     $(wildcard include/config/sysfs.h) \
@@ -497,6 +497,6 @@ deps_/home/fw/Desktop/hw5/module/firewall.mod.o := \
   include/linux/vermagic.h \
   include/generated/utsrelease.h \
 
-/home/fw/Desktop/hw5/module/firewall.mod.o: $(deps_/home/fw/Desktop/hw5/module/firewall.mod.o)
+/home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o: $(deps_/home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o)
 
-$(deps_/home/fw/Desktop/hw5/module/firewall.mod.o):
+$(deps_/home/fw/new_nuki/secws-master/hw5/module/firewall.mod.o):

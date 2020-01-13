@@ -4,35 +4,41 @@ import select
 import sys
 from email.parser import BytesParser
 
-C_KEYWORD = ['auto', 'const', 'double', 'float', 'int', 'short', 'struct',
-	 'unsigned', 'break', 'continue', 'else', 'for', 'long', 'signed',
-	  'switch', 'void', 'case', 'defualt', 'enum', 'goto', 'register',
-	    'sizeof', 'typedef', 'volatile', 'char', 'do', 'extern', 'if',
+C_KEYWORD = ['auto', 'const', 'double', 'float', 'int ', 'int*', 'short ', 'struct ',
+	 'unsigned', 'break', 'continue', 'else', 'for', 'long ', 'signed ',
+	  'switch', 'void ', 'case', 'defualt', 'enum', 'goto', 'register',
+	    'sizeof', 'typedef', 'volatile', 'char ', 'char*', 'do{', 'do \\n{', 'extern', 'if',
 		'return', 'static', 'union', 'while', '#define', '*', ';',
-		'#include' , '{', '}', '[', ']', '(', ')']
-line_seperators = [';', ')', '{','}', '&', ',', '|', '\n', '\r']
+	       '#include' , '{', '}', '[', ']', '(', ')', 'print', 'open(',
+ 		  'close(', 'gets(', 'read(','socket(', 'bind(', 'listen(',
+		'main', 'scanf(', 'write(', '||', '&&' ,'~', '->']
+line_seperators = [';', ')', '{','}', '&', ',', '|', '"',"'", '>', '\n', '\r']
 	
 STMP_PROXY_PORT = 250
 def stmp_filter(p):
+	p = str(p)
 	words = p.split()
 	freq_dict = {s:p.count(s) for s in C_KEYWORD}
 	total_keywords = sum(freq_dict.values())
-	print(total_keywords)
+	if(len(words) == 0):
+		return True
 	keyword_rate = total_keywords / len(words)
-	linesep_rate = sum([p.count(s + '\n') for s in line_seperators]) / p.count('\n')
-	print(keyword_rate, linesep_rate)
-	return True
+	if(p.count('\\n') > 0):
+		linesep_rate = sum([p.count(s + '\\n') for s in line_seperators]) / p.count('\\n')
+		print(keyword_rate, linesep_rate)
+		return not(keyword_rate >= 0.5 and linesep_rate >= 0.5)
+	return keyword_rate < 0.5
 
-f1 = '/home/fw/test'
+#f1 = '/home/fw/test'
 
-f2 = "/home/fw/Desktop/hw5/dry.txt"
+#f2 = "/home/fw/Desktop/hw5/dry.txt"
 
-f3 = "./stmp_proxy.py"
+#f3 = "./stmp_proxy.py"
 
-with open(f1) as f:
-	p = f.read()
-	stmp_filter(p)		
-sys.exit(0)
+#with open(f1) as f:
+#	p = f.read()
+#	stmp_filter(p)		
+#sys.exit(0)
 
 try:
 	in_sock = socket.socket()
@@ -74,7 +80,7 @@ while(True):
 					out_sock.close()
 					exit = 1
 					break
-				if(http_filter(p)):
+				if(stmp_filter(p)):
 					out_sock.sendall(p)
 					read.remove(conn)
 			if(c == out_sock):
@@ -85,9 +91,8 @@ while(True):
 					conn.close()
 					exit = 1
 					continue
-				if(http_filter(p)):
-					conn.send(p)
-					read.remove(out_sock)
+				conn.send(p)
+				read.remove(out_sock)
 
 in_sock.close()
 out_sock.close()
