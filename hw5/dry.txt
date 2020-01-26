@@ -1,7 +1,6 @@
 
 Module:
-	split into 3 code files and 3 headers
-	hw4secws.c -
+	hw5secws.c -
 		main file. containes the setup, registration code for the module and drivers.
 		- not very interesting
 	netfilter.c -
@@ -58,4 +57,18 @@ User program:
 	ip2int - transfers string ip (such as "127.0.0.1/32") to its numeric form (including the mask)	
 	int2ip - does the opposite	
 	utc_to_local - fixes timezone related problems
+
+HTTP Proxy:
+	Basically forwarding everything through it.
+	If it sees incoming response with the forbidden headers - drops
+	It also blocks attempt from host1 trying to expliot the SQLI given as a CVE on a remote (host2) host. 
+	It looks in the request parameters and ensures they are numeric as expected.
+	It also searches for outgoing C code by examining freqency of C keywords in the text and what chars are before line break (\n).
+FTP Proxy:
+	Forwarding like HTTP Proxy.
+	If it sees a PORT command, updates a speacial driver file.
+STMP Proxy:
+	Forwarding as well.
+	Checks for outgoing C code as in HTTP Proxy.
+
 

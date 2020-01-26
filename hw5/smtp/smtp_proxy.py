@@ -13,7 +13,7 @@ C_KEYWORD = ['auto', 'const', 'double', 'float', 'int ', 'int*', 'short ', 'stru
  		  'close(', 'gets(', 'read(','socket(', 'bind(', 'listen(',
 		'main', 'scanf(', 'write(', '||', '&&' ,'~', '->']
 line_seperators = [';', ')', '{','}', '&', ',', '|', '"',"'", '>', '\n', '\r']
-	
+#commod C keywords and line seperators
 SMTP_PROXY_PORT = 250
 def smtp_filter(p):
 	p = str(p)
@@ -28,16 +28,6 @@ def smtp_filter(p):
 		return not(keyword_rate >= 0.5 and linesep_rate >= 0.5)
 	return keyword_rate < 0.5
 
-#f1 = '/home/fw/test'
-
-#f2 = "/home/fw/Desktop/hw5/dry.txt"
-
-#f3 = "./smtp_proxy.py"
-
-#with open(f1) as f:
-#	p = f.read()
-#	smtp_filter(p)		
-#sys.exit(0)
 
 try:
 	in_sock = socket.socket()

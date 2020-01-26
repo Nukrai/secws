@@ -63,7 +63,7 @@ def sqli_filter(request_line):
 		fields = (parse_qs(splitted.query))
 		for f in SQLI_FIELDS:
 			if f in fields:
-				if not(fields[f][0].isnumeric()):
+				if not(fields[f][0].isnumeric()): # all of the fields should be numeric. if not -> likely to be an explioting attempt
 					print("SQLI in field {}".format(f),"|{}|".format(fields[f][0]))
 					return False
 		return True
@@ -74,7 +74,6 @@ def sqli_filter(request_line):
 
 def c_code_filter(p):
 	p = str(p)
-#	print(p)
 	words = p.split()
 	freq_dict = {s:p.count(s) for s in C_KEYWORD}
 	total_keywords = sum(freq_dict.values())
@@ -86,10 +85,6 @@ def c_code_filter(p):
 		return not(keyword_rate >= 0.5 and linesep_rate >= 0.5)
 	return keyword_rate < 0.5
 
-
-#f1 = '/home/fw/test'
-
-#f2 = "/home/fw/Desktop/hw5/dry.txt"
 
 
 try:
